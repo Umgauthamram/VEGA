@@ -1,8 +1,4 @@
-# Build Prompt: "LocalClaude" — Claude-Style Desktop App Powered by Ollama
 
-Copy everything below this line into Claude Code (or any coding agent) as your build prompt.
-
----
 
 ## PROJECT BRIEF
 
@@ -22,6 +18,7 @@ I will run models myself via CLI (e.g. `ollama run qwen2.5:14b`), and the app mu
 
 ---
 
+you have to code in "G:\projects\laude"
 ## 2. OLLAMA INTEGRATION (CORE)
 
 Connect to the local Ollama server at `http://localhost:11434` (make host/port configurable in Settings).
@@ -39,6 +36,7 @@ Connect to the local Ollama server at `http://localhost:11434` (make host/port c
 
 ---
 
+you have to code in "G:\projects\laude"
 ## 3. CHAT EXPERIENCE (CLAUDE-STYLE UI)
 
 Replicate the Claude.ai layout and polish:
@@ -53,6 +51,7 @@ Replicate the Claude.ai layout and polish:
 
 ---
 
+you have to code in "G:\projects\laude"
 ## 4. AGENTIC MODE
 
 A toggle in the chat header: **Chat mode** vs **Agent mode**.
@@ -79,6 +78,7 @@ In Agent mode the app runs a **tool-use loop**:
 
 ---
 
+you have to code in "G:\projects\laude"
 ## 5. MCP (MODEL CONTEXT PROTOCOL) SUPPORT
 
 Make the app a full **MCP client**:
@@ -92,6 +92,7 @@ Make the app a full **MCP client**:
 
 ---
 
+you have to code in "G:\projects\laude"
 ## 6. SCHEDULING / AUTOMATIONS
 
 A **Schedules** section in the sidebar:
@@ -104,6 +105,7 @@ A **Schedules** section in the sidebar:
 
 ---
 
+you have to code in "G:\projects\laude"
 ## 7. EXTRA FEATURES
 
 - **Quick launcher:** global hotkey (like Cmd/Ctrl+Shift+Space) opens a Spotlight-style floating prompt window for one-off questions.
@@ -115,6 +117,7 @@ A **Schedules** section in the sidebar:
 
 ---
 
+you have to code in "G:\projects\laude"
 ## 8. NON-FUNCTIONAL REQUIREMENTS
 
 - Everything works fully offline (except web tools and model pulls).
@@ -124,6 +127,7 @@ A **Schedules** section in the sidebar:
 - Include a README with setup steps, Ollama prerequisites, recommended models (tool-calling capable: qwen2.5, llama3.1, mistral-nemo; vision: llama3.2-vision; embeddings: nomic-embed-text), and how to add MCP servers.
 - Provide `npm run dev` for development and `npm run build` for production installers.
 
+you have to code in "G:\projects\laude"
 ## 9. BUILD ORDER
 
 Work in this sequence, showing me the app running after each phase:
