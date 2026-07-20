@@ -8,7 +8,7 @@ I will run models myself via CLI (e.g. `ollama run qwen2.5:14b`), and the app mu
 
 ---
 
-## 1. TECH STACK
+## phase 1. TECH STACK
 
 - **Shell:** Tauri 2.x (preferred, lightweight) — fall back to Electron only if Tauri blocks a feature I need.
 - **Frontend:** React 18 + TypeScript + Vite + TailwindCSS.
@@ -19,7 +19,7 @@ I will run models myself via CLI (e.g. `ollama run qwen2.5:14b`), and the app mu
 ---
 
 you have to code in "G:\projects\laude"
-## 2. OLLAMA INTEGRATION (CORE)
+## phase 2. OLLAMA INTEGRATION (CORE)
 
 Connect to the local Ollama server at `http://localhost:11434` (make host/port configurable in Settings).
 
@@ -36,8 +36,8 @@ Connect to the local Ollama server at `http://localhost:11434` (make host/port c
 
 ---
 
-you have to code in "G:\projects\laude"
-## 3. CHAT EXPERIENCE (CLAUDE-STYLE UI)
+you have to code in "G:\projects\laude" and if you want to access nextjs app -  "G:\projects\laude\laude".
+## phase 3. CHAT EXPERIENCE (CLAUDE-STYLE UI)
 
 Replicate the Claude.ai layout and polish:
 
@@ -51,8 +51,8 @@ Replicate the Claude.ai layout and polish:
 
 ---
 
-you have to code in "G:\projects\laude"
-## 4. AGENTIC MODE
+you have to code in "G:\projects\laude" and if you want to access nextjs app -  "G:\projects\laude\laude".
+## phase 4. AGENTIC MODE
 
 A toggle in the chat header: **Chat mode** vs **Agent mode**.
 
@@ -78,8 +78,8 @@ In Agent mode the app runs a **tool-use loop**:
 
 ---
 
-you have to code in "G:\projects\laude"
-## 5. MCP (MODEL CONTEXT PROTOCOL) SUPPORT
+you have to code in "G:\projects\laude"and if you want to access nextjs app -  "G:\projects\laude\laude".
+## phase 5. MCP (MODEL CONTEXT PROTOCOL) SUPPORT
 
 Make the app a full **MCP client**:
 
@@ -92,8 +92,8 @@ Make the app a full **MCP client**:
 
 ---
 
-you have to code in "G:\projects\laude"
-## 6. SCHEDULING / AUTOMATIONS
+you have to code in "G:\projects\laude"and if you want to access nextjs app -  "G:\projects\laude\laude".
+## phase 6. SCHEDULING / AUTOMATIONS
 
 A **Schedules** section in the sidebar:
 
@@ -105,8 +105,8 @@ A **Schedules** section in the sidebar:
 
 ---
 
-you have to code in "G:\projects\laude"
-## 7. EXTRA FEATURES
+you have to code in "G:\projects\laude"and if you want to access nextjs app -  "G:\projects\laude\laude".
+## phase 7. EXTRA FEATURES
 
 - **Quick launcher:** global hotkey (like Cmd/Ctrl+Shift+Space) opens a Spotlight-style floating prompt window for one-off questions.
 - **System tray** icon with quick actions.
@@ -117,8 +117,8 @@ you have to code in "G:\projects\laude"
 
 ---
 
-you have to code in "G:\projects\laude"
-## 8. NON-FUNCTIONAL REQUIREMENTS
+you have to code in "G:\projects\laude"and if you want to access nextjs app -  "G:\projects\laude\laude".
+## phase 8. NON-FUNCTIONAL REQUIREMENTS
 
 - Everything works fully offline (except web tools and model pulls).
 - No account, no login, no telemetry, no rate limiting logic anywhere.
@@ -127,8 +127,8 @@ you have to code in "G:\projects\laude"
 - Include a README with setup steps, Ollama prerequisites, recommended models (tool-calling capable: qwen2.5, llama3.1, mistral-nemo; vision: llama3.2-vision; embeddings: nomic-embed-text), and how to add MCP servers.
 - Provide `npm run dev` for development and `npm run build` for production installers.
 
-you have to code in "G:\projects\laude"
-## 9. BUILD ORDER
+you have to code in "G:\projects\laude"and if you want to access nextjs app -  "G:\projects\laude\laude".
+## phase 9. BUILD ORDER
 
 Work in this sequence, showing me the app running after each phase:
 1. Tauri + React shell, Ollama connection, streaming chat, model switcher, SQLite persistence.
