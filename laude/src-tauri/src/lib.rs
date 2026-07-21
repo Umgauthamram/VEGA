@@ -8,8 +8,9 @@ pub fn run() {
             .level(log::LevelFilter::Info)
             .build(),
         )?;
-        app.handle().plugin(tauri_plugin_sql::Builder::default().build())?;
       }
+      app.handle().plugin(tauri_plugin_sql::Builder::default().build())?;
+      app.handle().plugin(tauri_plugin_shell::Builder::default().build())?;
       Ok(())
     })
     .run(tauri::generate_context!())

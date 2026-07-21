@@ -99,17 +99,25 @@ export class OllamaClient {
 
   async streamChat(
     model: string,
-    messages: { role: string; content: string }[],
+    messages: { role: string; content: string; tool_calls?: any[] }[],
     options?: Partial<ModelPreset>,
     keepAlive?: string,
     onChunk?: (text: string) => void,
-    signal?: AbortSignal
-  ): Promise<string> {
+    signal?: AbortSignal,
+    tools?: any[]
+  ): Promise<{ content: string; tool_calls?: any[] }> {
     const body: any = {
       model,
       messages,
-      stream: true,
+      stream: false, // Stream must be false for tool calls handling in Ollama API sometimes, or streaming can yield tool_calls. Let's make stream: false if tools exist to ensure reliable tool_calls structures.
     };
+
+    if (tools && tools.length > 0) {
+      body.tools = tools;
+      body.stream = false;
+    } else {
+      body.stream = true;
+    }
 
     if (keepAlive) {
       body.keep_alive = keepAlive;
@@ -133,9 +141,22 @@ export class OllamaClient {
       signal,
     });
 
-    if (!res.ok || !res.body) {
+    if (!res.ok) {
       const errText = await res.text();
       throw new Error(`Ollama Chat Error ${res.status}: ${errText}`);
+    }
+
+    // Handle non-streaming response for tool calls
+    if (!body.stream) {
+      const data = await res.json();
+      return {
+        content: data.message?.content || '',
+        tool_calls: data.message?.tool_calls || undefined
+      };
+    }
+
+    if (!res.body) {
+      throw new Error('Response body is null');
     }
 
     const reader = res.body.getReader();
@@ -165,7 +186,7 @@ export class OllamaClient {
       }
     }
 
-    return fullText;
+    return { content: fullText };
   }
 
   async generateEmbedding(model: string, prompt: string): Promise<number[]> {

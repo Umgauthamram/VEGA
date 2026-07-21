@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Server, RefreshCw, Plus, MessageSquare, Trash2, Pin, Settings, 
   Send, Bot, User, Sparkles, Cpu, Sliders, ChevronDown, Download, 
-  AlertTriangle, Check, Layers, Paperclip, X, Eye, FolderPlus, FolderOpen, Save, BookOpen
+  AlertTriangle, Check, Layers, Paperclip, X, Eye, FolderPlus, FolderOpen, Save, BookOpen,
+  Activity, Play, AlertCircle, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import { ollamaClient } from './ollama';
 import { 
@@ -17,6 +18,7 @@ import { MarkdownRenderer } from './MarkdownRenderer';
 import { ArtifactsPanel } from './ArtifactsPanel';
 import { readTextOrFile } from './attachments';
 import { ingestProjectFile, queryRelevantChunks } from './rag';
+import { BUILTIN_TOOLS, executeToolLocally } from './agent';
 
 export default function Home() {
   // Connection & Models state
@@ -55,6 +57,14 @@ export default function Home() {
   // Memory
   const [userMemoryText, setUserMemoryText] = useState<string>('');
   const [showMemoryModal, setShowMemoryModal] = useState<boolean>(false);
+
+  // Agent Mode config
+  const [agentMode, setAgentMode] = useState<boolean>(false);
+  const [agentLogs, setAgentLogs] = useState<{ step: string; type: 'call' | 'response' | 'error'; timestamp: number }[]>([]);
+  const [showLogsPanel, setShowLogsPanel] = useState<boolean>(false);
+  const [workspaceDir, setWorkspaceDir] = useState<string>('G:\\projects\\laude\\workspace');
+  const [safetyLevel, setSafetyLevel] = useState<'yolo' | 'ask_dangerous' | 'ask_always'>('ask_dangerous');
+  const [pendingApproval, setPendingApproval] = useState<{ toolCallId: string; name: string; args: any; onApprove: () => void; onReject: () => void } | null>(null);
 
   // Model parameters / Settings state
   const [showSettings, setShowSettings] = useState<boolean>(false);
@@ -347,46 +357,146 @@ export default function Home() {
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
-    let accumulatedText = '';
-    try {
-      await ollamaClient.streamChat(
-        selectedModel || activeConv.model,
-        historyForOllama,
-        activePreset,
-        keepAlive,
-        (chunk) => {
-          accumulatedText += chunk;
-          setMessages((prev) =>
-            prev.map((m) => (m.id === assistantMsgId ? { ...m, content: accumulatedText } : m))
-          );
-        },
-        abortController.signal
-      );
+    // Handle normal chat mode vs Agent mode
+    if (!agentMode) {
+      let accumulatedText = '';
+      try {
+        await ollamaClient.streamChat(
+          selectedModel || activeConv.model,
+          historyForOllama,
+          activePreset,
+          keepAlive,
+          (chunk) => {
+            accumulatedText += chunk;
+            setMessages((prev) =>
+              prev.map((m) => (m.id === assistantMsgId ? { ...m, content: accumulatedText } : m))
+            );
+          },
+          abortController.signal
+        );
 
-      const finalAssistantMsg: ChatMessage = {
-        id: assistantMsgId,
-        conversation_id: currentConvId,
-        role: 'assistant',
-        content: accumulatedText,
-        timestamp: Date.now(),
-        model_used: selectedModel,
-      };
-      await saveMessage(finalAssistantMsg);
-    } catch (e: any) {
-      if (e.name !== 'AbortError') {
-        const errorMsg: ChatMessage = {
+        const finalAssistantMsg: ChatMessage = {
           id: assistantMsgId,
           conversation_id: currentConvId,
           role: 'assistant',
-          content: accumulatedText + `\n\n*(Error: ${e.message || 'Stream interrupted'})*`,
+          content: accumulatedText,
           timestamp: Date.now(),
           model_used: selectedModel,
         };
-        await saveMessage(errorMsg);
+        await saveMessage(finalAssistantMsg);
+      } catch (e: any) {
+        if (e.name !== 'AbortError') {
+          const errorMsg: ChatMessage = {
+            id: assistantMsgId,
+            conversation_id: currentConvId,
+            role: 'assistant',
+            content: accumulatedText + `\n\n*(Error: ${e.message || 'Stream interrupted'})*`,
+            timestamp: Date.now(),
+            model_used: selectedModel,
+          };
+          await saveMessage(errorMsg);
+        }
+      } finally {
+        setIsStreaming(false);
+        abortControllerRef.current = null;
       }
-    } finally {
-      setIsStreaming(false);
-      abortControllerRef.current = null;
+    } else {
+      // Agentic tool calling loop
+      try {
+        setAgentLogs([]);
+        setShowLogsPanel(true);
+        let currentMessages = [...historyForOllama];
+        let iteration = 0;
+        const maxIterations = 15;
+        let finalResponseText = '';
+
+        while (iteration < maxIterations) {
+          iteration++;
+          setAgentLogs((prev) => [...prev, { step: `Starting agent loop iteration ${iteration}`, type: 'call', timestamp: Date.now() }]);
+
+          // Send tools schema to Ollama API
+          const response = await ollamaClient.streamChat(
+            selectedModel || activeConv.model,
+            currentMessages,
+            activePreset,
+            keepAlive,
+            undefined,
+            abortController.signal,
+            BUILTIN_TOOLS
+          );
+
+          if (response.content) {
+            finalResponseText += response.content + '\n';
+            setMessages((prev) =>
+              prev.map((m) => (m.id === assistantMsgId ? { ...m, content: finalResponseText } : m))
+            );
+          }
+
+          if (response.tool_calls && response.tool_calls.length > 0) {
+            const toolCall = response.tool_calls[0]; // execute first tool call in sequence
+            const { name, arguments: args } = toolCall.function || toolCall;
+
+            setAgentLogs((prev) => [
+              ...prev,
+              { step: `Model requested tool: ${name} with arguments: ${JSON.stringify(args)}`, type: 'call', timestamp: Date.now() }
+            ]);
+
+            // Safety Approval check
+            const needsApproval = safetyLevel === 'ask_always' || (safetyLevel === 'ask_dangerous' && ['write_file', 'run_shell'].includes(name));
+            let toolOutput = '';
+
+            if (needsApproval) {
+              toolOutput = await new Promise<string>((resolve) => {
+                setPendingApproval({
+                  toolCallId: toolCall.id || 'tc_' + Date.now(),
+                  name,
+                  args,
+                  onApprove: async () => {
+                    setPendingApproval(null);
+                    const res = await executeToolLocally(name, args, workspaceDir, safetyLevel);
+                    resolve(res);
+                  },
+                  onReject: () => {
+                    setPendingApproval(null);
+                    resolve(`User rejected tool execution for ${name}.`);
+                  }
+                });
+              });
+            } else {
+              toolOutput = await executeToolLocally(name, args, workspaceDir, safetyLevel);
+            }
+
+            setAgentLogs((prev) => [
+              ...prev,
+              { step: `Tool response: ${toolOutput}`, type: 'response', timestamp: Date.now() }
+            ]);
+
+            // Append assistant tool request & response back to conversation history
+            currentMessages.push({ role: 'assistant', content: response.content || '', tool_calls: response.tool_calls } as any);
+            currentMessages.push({ role: 'tool', content: toolOutput, name } as any);
+          } else {
+            // No tool calls returned. We've reached final text answer.
+            setAgentLogs((prev) => [...prev, { step: `Agent finished execution loop successfully.`, type: 'response', timestamp: Date.now() }]);
+            break;
+          }
+        }
+
+        const finalMsg: ChatMessage = {
+          id: assistantMsgId,
+          conversation_id: currentConvId,
+          role: 'assistant',
+          content: finalResponseText,
+          timestamp: Date.now(),
+          model_used: selectedModel,
+        };
+        await saveMessage(finalMsg);
+
+      } catch (e: any) {
+        setAgentLogs((prev) => [...prev, { step: `Error: ${e.message || 'Execution failed'}`, type: 'error', timestamp: Date.now() }]);
+      } finally {
+        setIsStreaming(false);
+        abortControllerRef.current = null;
+      }
     }
   }
 
@@ -398,6 +508,28 @@ export default function Home() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-zinc-900 text-zinc-100 font-sans">
+      {/* Safety Approval Overlays */}
+      {pendingApproval && (
+        <div className="fixed inset-0 bg-black/85 z-55 flex items-center justify-center p-6 backdrop-blur-md animate-fade-in">
+          <div className="bg-zinc-950 border-2 border-amber-600/40 rounded-xl w-full max-w-md p-6 flex flex-col gap-4 shadow-2xl">
+            <div className="flex items-center gap-2 text-amber-500">
+              <AlertCircle className="w-6 h-6 animate-pulse" />
+              <h3 className="font-bold text-lg">Local Execution Required</h3>
+            </div>
+            <div className="bg-zinc-900 p-4 rounded-lg border border-zinc-800 text-sm font-mono space-y-2">
+              <div><strong>Tool:</strong> {pendingApproval.name}</div>
+              <div><strong>Arguments:</strong></div>
+              <pre className="text-xs text-zinc-400 bg-black/40 p-2 rounded overflow-x-auto whitespace-pre-wrap">{JSON.stringify(pendingApproval.args, null, 2)}</pre>
+            </div>
+            <p className="text-xs text-zinc-400">Do you approve this local system action? Click execute to continue agentic loop execution.</p>
+            <div className="flex gap-3 justify-end mt-2">
+              <button onClick={pendingApproval.onReject} className="bg-zinc-800 hover:bg-zinc-700 px-4 py-2 rounded-lg text-sm font-semibold transition text-zinc-300">Reject</button>
+              <button onClick={pendingApproval.onApprove} className="bg-amber-600 hover:bg-amber-500 px-4 py-2 rounded-lg text-sm font-semibold transition text-white">Approve & Run</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Health Status Banner */}
       {isConnected === false && (
         <div className="absolute top-0 left-0 right-0 z-50 bg-amber-600/90 backdrop-blur-md px-4 py-2 text-white flex items-center justify-between text-sm border-b border-amber-500">
@@ -492,7 +624,7 @@ export default function Home() {
 
       {/* Main chat interface */}
       <main className="flex-1 flex flex-col justify-between bg-zinc-900 relative min-w-0">
-        <header className="h-14 border-b border-zinc-850 px-6 flex items-center justify-between bg-zinc-900/50 backdrop-blur">
+        <header className="h-14 border-b border-zinc-855 px-6 flex items-center justify-between bg-zinc-900/50 backdrop-blur shrink-0">
           <div className="flex items-center gap-3">
             <Cpu className="w-4 h-4 text-zinc-400" />
             <select
@@ -511,6 +643,19 @@ export default function Home() {
               )}
             </select>
           </div>
+
+          {/* Toggle Agent mode vs normal chat */}
+          <div className="flex items-center gap-3 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1 text-xs">
+            <span className="font-semibold text-zinc-400 uppercase tracking-wider">Agent Mode</span>
+            <button onClick={() => setAgentMode(!agentMode)} className="text-amber-500 hover:text-amber-400 transition">
+              {agentMode ? <ToggleRight className="w-7 h-7" /> : <ToggleLeft className="w-7 h-7 text-zinc-600" />}
+            </button>
+            {agentMode && (
+              <button onClick={() => setShowLogsPanel(!showLogsPanel)} className="p-1 hover:bg-zinc-800 rounded text-zinc-400" title="Toggle trace logs">
+                <Activity className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </header>
 
         {/* Message Thread */}
@@ -519,9 +664,9 @@ export default function Home() {
             <div className="h-full flex flex-col items-center justify-center text-center text-zinc-500 gap-3">
               <Bot className="w-12 h-12 text-zinc-700" />
               <h2 className="text-lg font-medium text-zinc-300">How can Laude help you today?</h2>
-              {activeProjectId && (
+              {agentMode && (
                 <div className="text-xs bg-amber-500/10 border border-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg max-w-sm">
-                  Active Project: <strong className="underline">{projects.find(p => p.id === activeProjectId)?.name}</strong>. Knowledge base files will be queried automatically.
+                  Agent Mode activated. System tools (filesystem access, web fetches, and commands execution) will run locally on your system.
                 </div>
               )}
             </div>
@@ -557,7 +702,7 @@ export default function Home() {
         </div>
 
         {/* Input box */}
-        <div className="p-4 border-t border-zinc-800 bg-zinc-900/80 backdrop-blur">
+        <div className="p-4 border-t border-zinc-800 bg-zinc-900/80 backdrop-blur shrink-0">
           {attachments.length > 0 && (
             <div className="flex flex-wrap gap-2 max-w-3xl mx-auto mb-3">
               {attachments.map((a, idx) => (
@@ -585,7 +730,7 @@ export default function Home() {
                   handleSendMessage();
                 }
               }}
-              placeholder="Send message or upload code files..."
+              placeholder={agentMode ? "Provide a task for the Agent... (e.g. read package.json file)" : "Send message or upload code files..."}
               className="flex-1 bg-transparent border-none text-zinc-100 text-sm px-2 focus:outline-none resize-none max-h-32 min-h-[40px] py-2"
             />
 
@@ -609,6 +754,33 @@ export default function Home() {
           code={selectedArtifact.code}
           onClose={() => setSelectedArtifact(null)}
         />
+      )}
+
+      {/* Side-by-side Agent activity trace log panel */}
+      {agentMode && showLogsPanel && (
+        <div className="w-80 border-l border-zinc-800 bg-zinc-950 flex flex-col h-full shrink-0">
+          <div className="h-14 border-b border-zinc-800 px-4 flex items-center justify-between bg-zinc-900/50">
+            <span className="font-semibold text-xs text-zinc-200 flex items-center gap-1.5">
+              <Activity className="w-4 h-4 text-amber-500" /> Agent Tool Trace Log
+            </span>
+            <button onClick={() => setShowLogsPanel(false)} className="text-zinc-400 hover:text-white text-xl">×</button>
+          </div>
+          <div className="flex-1 p-4 overflow-y-auto space-y-4">
+            {agentLogs.length === 0 ? (
+              <div className="text-xs text-zinc-600 text-center py-10">No agent actions recorded in this step.</div>
+            ) : (
+              agentLogs.map((log, idx) => (
+                <div key={idx} className={`p-3 rounded-lg border text-xs leading-relaxed ${
+                  log.type === 'error' ? 'bg-rose-950/20 border-rose-900 text-rose-300' :
+                  log.type === 'response' ? 'bg-zinc-900 border-zinc-800 text-zinc-300' : 'bg-amber-600/10 border-amber-600/20 text-amber-400'
+                }`}>
+                  <div className="font-bold mb-1">{log.type.toUpperCase()} • {new Date(log.timestamp).toLocaleTimeString()}</div>
+                  <div className="whitespace-pre-wrap break-all font-mono">{log.step}</div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       )}
 
       {/* Memory Modal */}
@@ -744,8 +916,33 @@ export default function Home() {
                   type="text"
                   value={baseUrl}
                   onChange={(e) => setBaseUrl(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-850 rounded-lg px-3 py-2 text-sm focus:border-amber-500 outline-none text-zinc-200"
+                  className="w-full bg-zinc-950 border border-zinc-855 rounded-lg px-3 py-2 text-sm focus:border-amber-500 outline-none text-zinc-200"
                 />
+              </div>
+
+              {/* Agent Settings (Workspace Dir & Safety Level) */}
+              <div className="grid grid-cols-2 gap-4 border-t border-zinc-800 pt-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider font-mono">Agent Workspace Dir</label>
+                  <input
+                    type="text"
+                    value={workspaceDir}
+                    onChange={(e) => setWorkspaceDir(e.target.value)}
+                    className="w-full bg-zinc-955 border border-zinc-850 rounded-lg px-3 py-2 text-xs focus:border-amber-500 outline-none text-zinc-200 font-mono"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Agent Permission Safety Level</label>
+                  <select
+                    value={safetyLevel}
+                    onChange={(e) => setSafetyLevel(e.target.value as any)}
+                    className="w-full bg-zinc-950 border border-zinc-850 rounded-lg px-3 py-2 text-xs focus:border-amber-500 outline-none text-zinc-200"
+                  >
+                    <option value="yolo">YOLO (Auto-approve everything)</option>
+                    <option value="ask_dangerous">Ask for Dangerous Only (e.g. write, shell)</option>
+                    <option value="ask_always">Ask Always (Prompt every action)</option>
+                  </select>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -754,7 +951,7 @@ export default function Home() {
                   type="text"
                   value={embeddingModel}
                   onChange={(e) => setEmbeddingModel(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-850 rounded-lg px-3 py-2 text-sm focus:border-amber-500 outline-none text-zinc-200"
+                  className="w-full bg-zinc-955 border border-zinc-850 rounded-lg px-3 py-2 text-sm focus:border-amber-500 outline-none text-zinc-200"
                 />
               </div>
 
@@ -766,7 +963,7 @@ export default function Home() {
                     value={pullModelInput}
                     onChange={(e) => setPullModelInput(e.target.value)}
                     placeholder="e.g. nomic-embed-text, qwen2.5:14b..."
-                    className="flex-1 bg-zinc-950 border border-zinc-850 rounded-lg px-3 py-2 text-sm focus:border-amber-500 outline-none text-zinc-200"
+                    className="flex-1 bg-zinc-955 border border-zinc-850 rounded-lg px-3 py-2 text-sm focus:border-amber-500 outline-none text-zinc-200"
                   />
                   <button onClick={handlePullModel} className="bg-amber-600 hover:bg-amber-500 px-4 py-2 rounded-lg text-sm font-medium transition">Pull</button>
                 </div>
@@ -781,14 +978,14 @@ export default function Home() {
                 <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Installed Local Models</label>
                 <div className="space-y-2 max-h-40 overflow-y-auto">
                   {models.map((m) => (
-                    <div key={m.name} className="flex items-center justify-between bg-zinc-950 p-3 rounded-lg border border-zinc-850 text-sm">
+                    <div key={m.name} className="flex items-center justify-between bg-zinc-955 p-3 rounded-lg border border-zinc-850 text-sm">
                       <div>
                         <div className="font-medium text-zinc-200">{m.name}</div>
                         <div className="text-xs text-zinc-500">
                           Size: {(m.size / (1024 * 1024 * 1024)).toFixed(2)} GB | Params: {m.details?.parameter_size || 'N/A'}
                         </div>
                       </div>
-                      <button onClick={() => handleDeleteModel(m.name)} className="text-rose-400 hover:bg-rose-950/50 p-1.5 rounded transition">
+                      <button onClick={() => handleDeleteModel(m.name)} className="text-rose-400 hover:bg-rose-955/50 p-1.5 rounded transition">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
