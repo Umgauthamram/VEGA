@@ -63,6 +63,35 @@ export interface Conversation {
 
 export interface OllamaSettings {
   baseUrl: string;
-  keepAlive: string; // e.g., '5m', '1h', '-1'
+  keepAlive: string;
   defaultModel: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  system_prompt: string;
+  created_at: number;
+}
+
+export interface ProjectFile {
+  id: string;
+  project_id: string;
+  name: string;
+  content: string;
+  size: number;
+}
+
+export interface DocumentChunk {
+  id: string;
+  project_id: string;
+  file_id: string;
+  content: string;
+  embedding: number[];
+}
+
+export interface Attachment {
+  name: string;
+  type: string;
+  content: string;
 }

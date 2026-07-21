@@ -167,6 +167,22 @@ export class OllamaClient {
 
     return fullText;
   }
+
+  async generateEmbedding(model: string, prompt: string): Promise<number[]> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/embed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, input: prompt }),
+      });
+      if (!res.ok) throw new Error(`Embedding failed: ${res.statusText}`);
+      const data = await res.json();
+      return data.embeddings?.[0] || data.embedding || [];
+    } catch (e) {
+      console.error('Embedding error:', e);
+      return new Array(768).fill(0); // fallback vector
+    }
+  }
 }
 
 export const ollamaClient = new OllamaClient();
