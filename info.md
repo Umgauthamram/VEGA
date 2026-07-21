@@ -37,6 +37,7 @@ Connect to the local Ollama server at `http://localhost:11434` (make host/port c
 ---
 
 you have to code in "G:\projects\laude" and if you want to access nextjs app -  "G:\projects\laude\laude".
+important, whatever code you right, make sure it is been placed in right folder and files, you can create new files as well, and check the codes and ensure its working propelry.
 ## phase 3. CHAT EXPERIENCE (CLAUDE-STYLE UI)
 
 Replicate the Claude.ai layout and polish:
@@ -52,6 +53,7 @@ Replicate the Claude.ai layout and polish:
 ---
 
 you have to code in "G:\projects\laude" and if you want to access nextjs app -  "G:\projects\laude\laude".
+important, whatever code you right, make sure it is been placed in right folder and files, you can create new files as well, and check the codes and ensure its working propelry.
 ## phase 4. AGENTIC MODE
 
 A toggle in the chat header: **Chat mode** vs **Agent mode**.
@@ -79,6 +81,7 @@ In Agent mode the app runs a **tool-use loop**:
 ---
 
 you have to code in "G:\projects\laude"and if you want to access nextjs app -  "G:\projects\laude\laude".
+important, whatever code you right, make sure it is been placed in right folder and files, you can create new files as well, and check the codes and ensure its working propelry.
 ## phase 5. MCP (MODEL CONTEXT PROTOCOL) SUPPORT
 
 Make the app a full **MCP client**:
@@ -93,6 +96,7 @@ Make the app a full **MCP client**:
 ---
 
 you have to code in "G:\projects\laude"and if you want to access nextjs app -  "G:\projects\laude\laude".
+important, whatever code you right, make sure it is been placed in right folder and files, you can create new files as well, and check the codes and ensure its working propelry.
 ## phase 6. SCHEDULING / AUTOMATIONS
 
 A **Schedules** section in the sidebar:
@@ -106,6 +110,7 @@ A **Schedules** section in the sidebar:
 ---
 
 you have to code in "G:\projects\laude"and if you want to access nextjs app -  "G:\projects\laude\laude".
+important, whatever code you right, make sure it is been placed in right folder and files, you can create new files as well, and check the codes and ensure its working propelry.
 ## phase 7. EXTRA FEATURES
 
 - **Quick launcher:** global hotkey (like Cmd/Ctrl+Shift+Space) opens a Spotlight-style floating prompt window for one-off questions.
@@ -118,6 +123,7 @@ you have to code in "G:\projects\laude"and if you want to access nextjs app -  "
 ---
 
 you have to code in "G:\projects\laude"and if you want to access nextjs app -  "G:\projects\laude\laude".
+important, whatever code you right, make sure it is been placed in right folder and files, you can create new files as well, and check the codes and ensure its working propelry.
 ## phase 8. NON-FUNCTIONAL REQUIREMENTS
 
 - Everything works fully offline (except web tools and model pulls).
@@ -128,6 +134,7 @@ you have to code in "G:\projects\laude"and if you want to access nextjs app -  "
 - Provide `npm run dev` for development and `npm run build` for production installers.
 
 you have to code in "G:\projects\laude"and if you want to access nextjs app -  "G:\projects\laude\laude".
+important, whatever code you right, make sure it is been placed in right folder and files, you can create new files as well, and check the codes and ensure its working propelry.
 ## phase 9. BUILD ORDER
 
 Work in this sequence, showing me the app running after each phase:
