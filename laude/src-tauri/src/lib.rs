@@ -8,6 +8,7 @@ pub fn run() {
             .level(log::LevelFilter::Info)
             .build(),
         )?;
+        app.handle().plugin(tauri_plugin_sql::Builder::default().build())?;
       }
       Ok(())
     })
