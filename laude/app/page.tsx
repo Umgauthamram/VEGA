@@ -5,7 +5,7 @@ import {
   Server, RefreshCw, Plus, MessageSquare, Trash2, Pin, Settings, 
   Send, Bot, User, Sparkles, Cpu, Sliders, ChevronDown, Download, 
   AlertTriangle, Check, Layers, Paperclip, X, Eye, FolderPlus, FolderOpen, Save, BookOpen,
-  Activity, Play, AlertCircle, ToggleLeft, ToggleRight
+  Activity, Play, AlertCircle, ToggleLeft, ToggleRight, Share2
 } from 'lucide-react';
 import { ollamaClient } from './ollama';
 import { 
@@ -19,6 +19,7 @@ import { ArtifactsPanel } from './ArtifactsPanel';
 import { readTextOrFile } from './attachments';
 import { ingestProjectFile, queryRelevantChunks } from './rag';
 import { BUILTIN_TOOLS, executeToolLocally } from './agent';
+import { getMcpServers, saveMcpServer, deleteMcpServer, connectMcpServer, executeMcpTool, getLoadedMcpTools, McpServerConfig } from './mcp';
 
 export default function Home() {
   // Connection & Models state
@@ -66,6 +67,13 @@ export default function Home() {
   const [safetyLevel, setSafetyLevel] = useState<'yolo' | 'ask_dangerous' | 'ask_always'>('ask_dangerous');
   const [pendingApproval, setPendingApproval] = useState<{ toolCallId: string; name: string; args: any; onApprove: () => void; onReject: () => void } | null>(null);
 
+  // MCP Servers configurations
+  const [mcpServers, setMcpServers] = useState<McpServerConfig[]>([]);
+  const [showMcpModal, setShowMcpModal] = useState<boolean>(false);
+  const [newMcpName, setNewMcpName] = useState<string>('');
+  const [newMcpCommand, setNewMcpCommand] = useState<string>('');
+  const [newMcpArgs, setNewMcpArgs] = useState<string>('');
+
   // Model parameters / Settings state
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [baseUrl, setBaseUrl] = useState<string>('http://localhost:11434');
@@ -108,6 +116,9 @@ export default function Home() {
       setProjects(loadedProjects);
       const memory = await loadUserMemory();
       setUserMemoryText(memory);
+      
+      // Load MCP Servers list
+      setMcpServers(getMcpServers());
     })();
   }, []);
 
@@ -243,6 +254,37 @@ export default function Home() {
   async function handleSaveMemory() {
     await saveUserMemory(userMemoryText);
     setShowMemoryModal(false);
+  }
+
+  // MCP Server handlers
+  async function handleAddMcpServer() {
+    if (!newMcpName.trim() || !newMcpCommand.trim()) return;
+    const config: McpServerConfig = {
+      name: newMcpName.trim(),
+      command: newMcpCommand.trim(),
+      args: newMcpArgs.split(',').map((a) => a.trim()).filter(Boolean),
+      enabled: true,
+    };
+    saveMcpServer(config);
+    await connectMcpServer(config);
+    setMcpServers([...getMcpServers()]);
+    setNewMcpName('');
+    setNewMcpCommand('');
+    setNewMcpArgs('');
+  }
+
+  async function handleToggleMcpServer(server: McpServerConfig) {
+    const updated = { ...server, enabled: !server.enabled };
+    saveMcpServer(updated);
+    if (updated.enabled) {
+      await connectMcpServer(updated);
+    }
+    setMcpServers([...getMcpServers()]);
+  }
+
+  function handleDeleteMcpServer(name: string) {
+    deleteMcpServer(name);
+    setMcpServers([...getMcpServers()]);
   }
 
   async function handlePullModel() {
@@ -410,6 +452,16 @@ export default function Home() {
         const maxIterations = 15;
         let finalResponseText = '';
 
+        // Dynamically join Builtin Tools + loaded MCP tools
+        const dynamicTools = [
+          ...BUILTIN_TOOLS,
+          ...getLoadedMcpTools().map((t) => ({
+            name: t.name,
+            description: t.description,
+            parameters: t.inputSchema,
+          }))
+        ];
+
         while (iteration < maxIterations) {
           iteration++;
           setAgentLogs((prev) => [...prev, { step: `Starting agent loop iteration ${iteration}`, type: 'call', timestamp: Date.now() }]);
@@ -422,7 +474,7 @@ export default function Home() {
             keepAlive,
             undefined,
             abortController.signal,
-            BUILTIN_TOOLS
+            dynamicTools
           );
 
           if (response.content) {
@@ -441,9 +493,11 @@ export default function Home() {
               { step: `Model requested tool: ${name} with arguments: ${JSON.stringify(args)}`, type: 'call', timestamp: Date.now() }
             ]);
 
-            // Safety Approval check
-            const needsApproval = safetyLevel === 'ask_always' || (safetyLevel === 'ask_dangerous' && ['write_file', 'run_shell'].includes(name));
+            // Execute MCP tool or system builtin tool
+            const isMcp = getLoadedMcpTools().some((t) => t.name === name);
             let toolOutput = '';
+
+            const needsApproval = safetyLevel === 'ask_always' || (safetyLevel === 'ask_dangerous' && ['write_file', 'run_shell'].includes(name));
 
             if (needsApproval) {
               toolOutput = await new Promise<string>((resolve) => {
@@ -453,17 +507,17 @@ export default function Home() {
                   args,
                   onApprove: async () => {
                     setPendingApproval(null);
-                    const res = await executeToolLocally(name, args, workspaceDir, safetyLevel);
+                    const res = isMcp ? await executeMcpTool(name, args) : await executeToolLocally(name, args, workspaceDir, safetyLevel);
                     resolve(res);
                   },
                   onReject: () => {
                     setPendingApproval(null);
-                    resolve(`User rejected tool execution for ${name}.`);
+                    resolve(`User rejected execution for tool ${name}.`);
                   }
                 });
               });
             } else {
-              toolOutput = await executeToolLocally(name, args, workspaceDir, safetyLevel);
+              toolOutput = isMcp ? await executeMcpTool(name, args) : await executeToolLocally(name, args, workspaceDir, safetyLevel);
             }
 
             setAgentLogs((prev) => [
@@ -558,6 +612,9 @@ export default function Home() {
               <button onClick={() => setShowProjectsModal(true)} className="p-1 rounded hover:bg-zinc-850 text-zinc-400" title="Projects (Local RAG)">
                 <FolderOpen className="w-4 h-4" />
               </button>
+              <button onClick={() => setShowMcpModal(true)} className="p-1 rounded hover:bg-zinc-850 text-zinc-400" title="MCP Servers">
+                <Share2 className="w-4 h-4" />
+              </button>
               <button onClick={() => setShowSettings(!showSettings)} className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400" title="Settings">
                 <Settings className="w-4 h-4" />
               </button>
@@ -570,7 +627,7 @@ export default function Home() {
 
           {/* Projects Switcher */}
           {projects.length > 0 && (
-            <div className="px-2 py-1.5 bg-zinc-900/40 rounded-lg border border-zinc-850 flex flex-col gap-1.5">
+            <div className="px-2 py-1.5 bg-zinc-900/40 rounded-lg border border-zinc-855 flex flex-col gap-1.5">
               <span className="text-[10px] font-semibold text-zinc-500 uppercase">Active Project</span>
               <select
                 value={activeProjectId || ''}
@@ -586,7 +643,7 @@ export default function Home() {
           )}
 
           {/* Conversations List */}
-          <div className="flex flex-col gap-1 mt-2 overflow-y-auto max-h-[calc(100vh-280px)]">
+          <div className="flex flex-col gap-1 mt-2 overflow-y-auto max-h-[calc(100vh-320px)]">
             <span className="text-[11px] font-semibold text-zinc-500 px-2 uppercase tracking-wider">Conversations</span>
             {conversations.map((conv) => (
               <div
@@ -714,7 +771,7 @@ export default function Home() {
             </div>
           )}
 
-          <div className="max-w-3xl mx-auto flex items-center gap-2 bg-zinc-950 border border-zinc-850 rounded-xl p-2 focus-within:border-amber-500/40">
+          <div className="max-w-3xl mx-auto flex items-center gap-2 bg-zinc-950 border border-zinc-855 rounded-xl p-2 focus-within:border-amber-500/40">
             <button onClick={() => fileInputRef.current?.click()} className="p-2 text-zinc-500 hover:text-zinc-300 transition" title="Add File / Image Attachment">
               <Paperclip className="w-5 h-5" />
             </button>
@@ -758,7 +815,7 @@ export default function Home() {
 
       {/* Side-by-side Agent activity trace log panel */}
       {agentMode && showLogsPanel && (
-        <div className="w-80 border-l border-zinc-800 bg-zinc-950 flex flex-col h-full shrink-0">
+        <div className="w-80 border-l border-zinc-800 bg-zinc-955 flex flex-col h-full shrink-0">
           <div className="h-14 border-b border-zinc-800 px-4 flex items-center justify-between bg-zinc-900/50">
             <span className="font-semibold text-xs text-zinc-200 flex items-center gap-1.5">
               <Activity className="w-4 h-4 text-amber-500" /> Agent Tool Trace Log
@@ -898,6 +955,84 @@ export default function Home() {
         </div>
       )}
 
+      {/* MCP Servers Manager Modal */}
+      {showMcpModal && (
+        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-850 rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+              <h3 className="font-semibold text-lg flex items-center gap-2">
+                <Share2 className="w-5 h-5 text-amber-500" /> Model Context Protocol (MCP) Servers
+              </h3>
+              <button onClick={() => setShowMcpModal(false)} className="text-zinc-400 hover:text-white text-xl">×</button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              <div className="bg-zinc-950 p-4 rounded-lg border border-zinc-850 space-y-3">
+                <h4 className="text-xs font-semibold text-zinc-300">Add stdio MCP Server</h4>
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    value={newMcpName}
+                    onChange={(e) => setNewMcpName(e.target.value)}
+                    placeholder="Server Name (e.g. github)"
+                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none focus:border-amber-500"
+                  />
+                  <input
+                    type="text"
+                    value={newMcpCommand}
+                    onChange={(e) => setNewMcpCommand(e.target.value)}
+                    placeholder="Command (e.g. node)"
+                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none focus:border-amber-500"
+                  />
+                  <input
+                    type="text"
+                    value={newMcpArgs}
+                    onChange={(e) => setNewMcpArgs(e.target.value)}
+                    placeholder="Args (comma separated)"
+                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none focus:border-amber-500"
+                  />
+                </div>
+                <button onClick={handleAddMcpServer} className="bg-amber-600 hover:bg-amber-500 text-xs font-bold px-4 py-1.5 rounded transition">
+                  Connect Server
+                </button>
+              </div>
+
+              {/* Active MCP Servers list */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-semibold text-zinc-300">Connected MCP Endpoints</h4>
+                {mcpServers.length === 0 ? (
+                  <div className="text-xs text-zinc-500">No MCP servers registered. Registered servers expose tools directly to LLM in Agent Mode.</div>
+                ) : (
+                  <div className="space-y-2">
+                    {mcpServers.map((srv) => (
+                      <div key={srv.name} className="flex items-center justify-between bg-zinc-950 p-3 rounded-lg border border-zinc-850 text-xs">
+                        <div>
+                          <div className="font-semibold text-zinc-200">{srv.name}</div>
+                          <div className="text-[10px] text-zinc-500 font-mono mt-0.5">{srv.command} {srv.args.join(' ')}</div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => handleToggleMcpServer(srv)}
+                            className={`px-3 py-1 rounded text-[10px] font-bold ${
+                              srv.enabled ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/20' : 'bg-zinc-850 text-zinc-500 border border-zinc-800'
+                            }`}
+                          >
+                            {srv.enabled ? 'Enabled' : 'Disabled'}
+                          </button>
+                          <button onClick={() => handleDeleteMcpServer(srv.name)} className="text-rose-400 hover:bg-rose-950/40 p-1.5 rounded transition">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Settings Modal */}
       {showSettings && (
         <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
@@ -978,7 +1113,7 @@ export default function Home() {
                 <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Installed Local Models</label>
                 <div className="space-y-2 max-h-40 overflow-y-auto">
                   {models.map((m) => (
-                    <div key={m.name} className="flex items-center justify-between bg-zinc-955 p-3 rounded-lg border border-zinc-850 text-sm">
+                    <div key={m.name} className="flex items-center justify-between bg-zinc-955 p-3 rounded-lg border border-zinc-855 text-sm">
                       <div>
                         <div className="font-medium text-zinc-200">{m.name}</div>
                         <div className="text-xs text-zinc-500">
