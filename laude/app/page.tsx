@@ -135,11 +135,36 @@ export default function Home() {
       setMcpServers(getMcpServers());
       setSchedulesList(getSchedules());
 
+      // Load LLM Providers
+      const { loadProviders, saveProviders } = await import('./storage');
+      let providers = await loadProviders();
+      if (providers.length === 0) {
+        providers = [
+          { name: 'Ollama (Local)', baseUrl: 'http://localhost:11434', type: 'ollama' },
+          { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api', type: 'openai-compatible', apiKey: '' },
+          { name: 'Groq', baseUrl: 'https://api.groq.com/openai', type: 'openai-compatible', apiKey: '' },
+          { name: 'LM Studio', baseUrl: 'http://localhost:1234', type: 'openai-compatible', apiKey: '' }
+        ];
+        await saveProviders(providers);
+      }
+      setProvidersList(providers);
+      const activeP = providers[0];
+      setActiveProviderName(activeP.name);
+      ollamaClient.setProvider(activeP);
+
       // Mock seed stats
       setTotalTokensGenerated(Math.floor(Math.random() * 12500) + 4000);
       setTokensPerSecond(Math.floor(Math.random() * 25) + 35);
     })();
   }, []);
+
+  const [providersList, setProvidersList] = useState<any[]>([]);
+  const [activeProviderName, setActiveProviderName] = useState<string>('');
+  const [newProvName, setNewProvName] = useState<string>('');
+  const [newProvBaseUrl, setNewProvBaseUrl] = useState<string>('');
+  const [newProvApiKey, setNewProvApiKey] = useState<string>('');
+  const [newProvType, setNewProvType] = useState<'ollama' | 'openai-compatible'>('ollama');
+  const [showApiKey, setShowApiKey] = useState<boolean>(false);
 
   // Background automation tick simulator checking schedules
   useEffect(() => {
@@ -189,7 +214,6 @@ export default function Home() {
   }, [messages, isStreaming]);
 
   async function checkOllamaHealth() {
-    ollamaClient.setBaseUrl(baseUrl);
     const health = await ollamaClient.checkHealth();
     setIsConnected(health.running);
     if (health.running) {
@@ -201,8 +225,13 @@ export default function Home() {
   async function refreshModels() {
     const list = await ollamaClient.listModels();
     setModels(list);
-    if (list.length > 0 && !selectedModel) {
-      setSelectedModel(list[0].name);
+    if (list.length > 0) {
+      // Keep selected model if it exists in new list, otherwise fallback
+      if (!list.some(m => m.name === selectedModel)) {
+        setSelectedModel(list[0].name);
+      }
+    } else {
+      setSelectedModel('');
     }
     const ps = await ollamaClient.listRunningModels();
     setRunningModels(ps);
@@ -351,6 +380,41 @@ export default function Home() {
   function handleDeleteSchedule(id: string) {
     deleteSchedule(id);
     setSchedulesList([...getSchedules()]);
+  }
+
+  // LLM Providers Handlers
+  async function handleAddProvider() {
+    if (!newProvName.trim() || !newProvBaseUrl.trim()) return;
+    const newProv = {
+      name: newProvName.trim(),
+      baseUrl: newProvBaseUrl.trim(),
+      apiKey: newProvApiKey.trim(),
+      type: newProvType
+    };
+    const updated = [...providersList, newProv];
+    setProvidersList(updated);
+    const { saveProviders } = await import('./storage');
+    await saveProviders(updated);
+    setNewProvName('');
+    setNewProvBaseUrl('');
+    setNewProvApiKey('');
+  }
+
+  async function handleDeleteProvider(name: string) {
+    const updated = providersList.filter(p => p.name !== name);
+    setProvidersList(updated);
+    const { saveProviders } = await import('./storage');
+    await saveProviders(updated);
+    if (activeProviderName === name && updated.length > 0) {
+      handleSelectProvider(updated[0]);
+    }
+  }
+
+  async function handleSelectProvider(p: any) {
+    setActiveProviderName(p.name);
+    ollamaClient.setProvider(p);
+    setBaseUrl(p.baseUrl);
+    await checkOllamaHealth();
   }
 
   // Backup exporter utility
@@ -548,15 +612,19 @@ export default function Home() {
         setTotalTokensGenerated((prev) => prev + Math.ceil(accumulatedText.length / 4));
       } catch (e: any) {
         if (e.name !== 'AbortError') {
+          const errMsgContent = accumulatedText + `\n\n*(Error: ${e.message || 'Stream interrupted'})*`;
           const errorMsg: ChatMessage = {
             id: assistantMsgId,
             conversation_id: currentConvId,
             role: 'assistant',
-            content: accumulatedText + `\n\n*(Error: ${e.message || 'Stream interrupted'})*`,
+            content: errMsgContent,
             timestamp: Date.now(),
             model_used: selectedModel,
           };
           await saveMessage(errorMsg);
+          setMessages((prev) =>
+            prev.map((m) => (m.id === assistantMsgId ? { ...m, content: errMsgContent } : m))
+          );
         }
       } finally {
         setIsStreaming(false);
@@ -828,6 +896,9 @@ export default function Home() {
                 ))
               )}
             </select>
+            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-zinc-850 border border-zinc-800 text-zinc-400">
+              {activeProviderName}
+            </span>
           </div>
 
           {/* Toggle Agent mode vs normal chat */}
@@ -847,15 +918,48 @@ export default function Home() {
         {/* Message Thread */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center text-zinc-500 gap-3">
-              <Bot className="w-12 h-12 text-zinc-700" />
-              <h2 className="text-lg font-medium text-zinc-300">How can Laude help you today?</h2>
-              {agentMode && (
-                <div className="text-xs bg-amber-500/10 border border-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg max-w-sm">
-                  Agent Mode activated. System tools (filesystem access, web fetches, and commands execution) will run locally on your system.
+            models.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center text-zinc-500 gap-4 max-w-md mx-auto">
+                <Bot className="w-12 h-12 text-zinc-700 animate-pulse" />
+                <h2 className="text-lg font-medium text-zinc-300">No chat model installed</h2>
+                <p className="text-xs text-zinc-500">Pull a recommended model locally to start chat conversations offline.</p>
+                <div className="flex flex-col gap-2 w-full mt-2">
+                  <button 
+                    onClick={() => { setPullModelInput('llama3.2:3b'); handlePullModel(); }}
+                    className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-xs py-2 px-3 rounded-lg transition font-medium"
+                  >
+                    Pull Llama 3.2 (3B - Fast)
+                  </button>
+                  <button 
+                    onClick={() => { setPullModelInput('qwen2.5:7b'); handlePullModel(); }}
+                    className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-xs py-2 px-3 rounded-lg transition font-medium"
+                  >
+                    Pull Qwen 2.5 (7B - Precise)
+                  </button>
+                  <button 
+                    onClick={() => { setPullModelInput('mistral:7b'); handlePullModel(); }}
+                    className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-xs py-2 px-3 rounded-lg transition font-medium"
+                  >
+                    Pull Mistral (7B - Creative)
+                  </button>
                 </div>
-              )}
-            </div>
+                {pullProgress && (
+                  <div className="text-xs text-amber-500 mt-2 font-mono">
+                    {pullProgress.status} {pullProgress.percent !== undefined ? `(${pullProgress.percent}%)` : ''}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center text-zinc-500 gap-3">
+                <Bot className="w-12 h-12 text-zinc-700" />
+                <h2 className="text-lg font-medium text-zinc-300">How can Laude help you today?</h2>
+                {agentMode && (
+                  <div className="text-xs bg-amber-500/10 border border-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg max-w-sm">
+                    Agent Mode activated. System tools (filesystem access, web fetches, and commands execution) will run locally on your system.
+                  </div>
+                )}
+              </div>
+            )
           ) : (
             messages.map((msg) => (
               <div key={msg.id} className={`flex gap-4 max-w-3xl mx-auto ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -865,13 +969,24 @@ export default function Home() {
                   </div>
                 )}
                 <div className={`p-4 rounded-xl text-sm leading-relaxed max-w-2xl whitespace-pre-wrap ${
-                  msg.role === 'user' ? 'bg-zinc-800 text-zinc-100 rounded-tr-none' : 'bg-zinc-950/80 text-zinc-200 rounded-tl-none border border-zinc-850'
+                  msg.role === 'user' ? 'bg-zinc-800 text-zinc-100 rounded-tr-none' : 
+                  msg.content.includes('*(Error:') ? 'bg-rose-950/40 text-rose-200 rounded-tl-none border border-rose-900/50' :
+                  'bg-zinc-950/80 text-zinc-200 rounded-tl-none border border-zinc-850'
                 }`}>
                   {msg.role === 'assistant' ? (
-                    <MarkdownRenderer 
-                      content={msg.content} 
-                      onCodeBlockClick={(lang, code) => setSelectedArtifact({ language: lang, code })} 
-                    />
+                    msg.content === '' ? (
+                      <div className="flex items-center gap-1.5 py-1 text-zinc-500 font-mono text-xs">
+                        <span className="animate-bounce font-bold">●</span>
+                        <span className="animate-bounce delay-75 font-bold">●</span>
+                        <span className="animate-bounce delay-150 font-bold">●</span>
+                        <span className="ml-1 text-[10px] uppercase font-semibold tracking-wider">thinking...</span>
+                      </div>
+                    ) : (
+                      <MarkdownRenderer 
+                        content={msg.content} 
+                        onCodeBlockClick={(lang, code) => setSelectedArtifact({ language: lang, code })} 
+                      />
+                    )
                   ) : (
                     <span>{msg.content}</span>
                   )}
@@ -1296,8 +1411,100 @@ export default function Home() {
             </div>
 
             <div className="p-6 overflow-y-auto space-y-6">
+              {/* Providers Configuration */}
+              <div className="bg-zinc-950 p-4 rounded-lg border border-zinc-850 space-y-4">
+                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                  <Server className="w-4 h-4 text-amber-500" /> LLM API Providers
+                </label>
+                <div className="space-y-3">
+                  <div className="flex gap-2 items-center">
+                    <span className="text-xs text-zinc-400">Active Provider:</span>
+                    <select
+                      value={activeProviderName}
+                      onChange={(e) => {
+                        const target = providersList.find(p => p.name === e.target.value);
+                        if (target) handleSelectProvider(target);
+                      }}
+                      className="bg-zinc-900 border border-zinc-800 text-xs rounded px-2 py-1 text-zinc-300 focus:outline-none"
+                    >
+                      {providersList.map((p) => (
+                        <option key={p.name} value={p.name}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="border-t border-zinc-800 pt-3 space-y-2">
+                    <h4 className="text-xs font-semibold text-zinc-300">Add New Provider</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={newProvName}
+                        onChange={(e) => setNewProvName(e.target.value)}
+                        placeholder="Provider Name (e.g. OpenRouter)"
+                        className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none text-zinc-200"
+                      />
+                      <input
+                        type="text"
+                        value={newProvBaseUrl}
+                        onChange={(e) => setNewProvBaseUrl(e.target.value)}
+                        placeholder="Base URL"
+                        className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none text-zinc-200"
+                      />
+                      <div className="col-span-2 flex gap-2">
+                        <select
+                          value={newProvType}
+                          onChange={(e) => setNewProvType(e.target.value as any)}
+                          className="bg-zinc-900 border border-zinc-800 text-xs rounded p-2 text-zinc-300"
+                        >
+                          <option value="ollama">Ollama</option>
+                          <option value="openai-compatible">OpenAI Compatible</option>
+                        </select>
+                        {newProvType === 'openai-compatible' && (
+                          <div className="flex-1 flex gap-2">
+                            <input
+                              type={showApiKey ? "text" : "password"}
+                              value={newProvApiKey}
+                              onChange={(e) => setNewProvApiKey(e.target.value)}
+                              placeholder="API Key"
+                              className="flex-1 bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none text-zinc-200"
+                            />
+                            <button
+                              onClick={() => setShowApiKey(!showApiKey)}
+                              type="button"
+                              className="bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs px-2 rounded border border-zinc-700"
+                            >
+                              {showApiKey ? "Hide" : "Show"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <button onClick={handleAddProvider} className="bg-amber-600 hover:bg-amber-500 text-xs font-bold px-4 py-1.5 rounded transition">
+                      Add Provider
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5 border-t border-zinc-800 pt-3">
+                    <span className="text-[10px] font-semibold text-zinc-500 uppercase">Provider List</span>
+                    {providersList.map((p) => (
+                      <div key={p.name} className="flex justify-between items-center text-xs bg-zinc-900 p-2 rounded border border-zinc-850">
+                        <div>
+                          <span className="font-semibold text-zinc-300">{p.name}</span>
+                          <span className="text-[10px] text-zinc-500 block">{p.baseUrl} ({p.type})</span>
+                        </div>
+                        {p.name !== 'Ollama (Local)' && (
+                          <button onClick={() => handleDeleteProvider(p.name)} className="text-rose-400 hover:bg-rose-950/40 p-1.5 rounded transition">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Ollama Server Base URL</label>
+                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Base Connection URL</label>
                 <input
                   type="text"
                   value={baseUrl}

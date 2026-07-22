@@ -51,13 +51,44 @@ export class LLMClient {
     }
   }
 
+  async showModelInfo(modelName: string): Promise<any> {
+    if (this.activeProvider.type !== 'ollama') return null;
+    try {
+      const res = await fetch(`${this.activeProvider.baseUrl}/api/show`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: modelName })
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn('Failed to query model details:', e);
+    }
+    return null;
+  }
+
   async listModels(): Promise<OllamaModel[]> {
     try {
       if (this.activeProvider.type === 'ollama') {
         const res = await fetch(`${this.activeProvider.baseUrl}/api/tags`);
         if (res.ok) {
           const data = await res.json();
-          return data.models || [];
+          const list: OllamaModel[] = data.models || [];
+          // Query details for each model to inspect capabilities
+          const filtered: OllamaModel[] = [];
+          for (const m of list) {
+            const info = await this.showModelInfo(m.name);
+            const caps: string[] = info?.details?.families || info?.families || [];
+            // Parse capabilities (Ollama details contains format/families)
+            // By default, if it's not strictly known, we check if it is not an embed model
+            const isEmbed = m.name.toLowerCase().includes('embed') || (info?.projector_info);
+            const isCompletion = !isEmbed; 
+            if (isCompletion) {
+              filtered.push(m);
+            }
+          }
+          return filtered;
         }
       } else {
         const res = await fetch(`${this.activeProvider.baseUrl}/v1/models`, {
@@ -175,7 +206,14 @@ export class LLMClient {
         signal
       });
 
-      if (!res.ok) throw new Error(`Ollama error ${res.status}`);
+      if (!res.ok) {
+        try {
+          const errJson = await res.json();
+          throw new Error(errJson.error || `Ollama error ${res.status}`);
+        } catch {
+          throw new Error(`Ollama error ${res.status}`);
+        }
+      }
       if (!body.stream) {
         const data = await res.json();
         return {

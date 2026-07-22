@@ -99,7 +99,20 @@ async function initDbSchema(db: Database) {
       updated_at INTEGER NOT NULL
     );
   `);
+
+  // LLM Providers Table
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS providers (
+      name TEXT PRIMARY KEY,
+      baseUrl TEXT NOT NULL,
+      apiKey TEXT,
+      type TEXT NOT NULL
+    );
+  `);
 }
+
+// Memory fallbacks
+const memoryProviders: Map<string, any> = new Map();
 
 // Memory fallbacks
 const memoryConversations: Map<string, Conversation> = new Map();
@@ -370,5 +383,36 @@ export async function loadUserMemory(): Promise<string> {
     return rows.length > 0 ? rows[0].content : '';
   } else {
     return memoryUserMemory;
+  }
+}
+
+export async function saveProviders(providersList: any[]): Promise<void> {
+  const db = await getDb();
+  if (db) {
+    await db.execute(`DELETE FROM providers`);
+    for (const p of providersList) {
+      await db.execute(
+        `INSERT INTO providers (name, baseUrl, apiKey, type) VALUES ($1, $2, $3, $4)`,
+        [p.name, p.baseUrl, p.apiKey || null, p.type]
+      );
+    }
+  } else {
+    memoryProviders.clear();
+    providersList.forEach(p => memoryProviders.set(p.name, p));
+  }
+}
+
+export async function loadProviders(): Promise<any[]> {
+  const db = await getDb();
+  if (db) {
+    const rows = await db.select<any[]>(`SELECT * FROM providers`);
+    return rows.map((r) => ({
+      name: r.name,
+      baseUrl: r.baseUrl,
+      apiKey: r.apiKey,
+      type: r.type,
+    }));
+  } else {
+    return Array.from(memoryProviders.values());
   }
 }
