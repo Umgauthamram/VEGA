@@ -10,16 +10,14 @@
   --border-color: #E2E0D4;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #262624;
-    --foreground: #E5E2D9;
-    --sidebar: #1F1E1B;
-    --accent: #D97757;
-    --accent-hover: #E28C70;
-    --card-bg: #1A1A18;
-    --border-color: #383733;
-  }
+html.dark {
+  --background: #262624;
+  --foreground: #E5E2D9;
+  --sidebar: #1F1E1B;
+  --accent: #D97757;
+  --accent-hover: #E28C70;
+  --card-bg: #30302E;
+  --border-color: #3A3935;
 }
 
 @theme inline {

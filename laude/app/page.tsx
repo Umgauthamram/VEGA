@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Server, RefreshCw, Plus, MessageSquare, Trash2, Pin, Settings, 
-  Send, Bot, User, Sparkles, Cpu, Sliders, ChevronDown, Download, 
-  AlertTriangle, Check, Layers, Paperclip, X, Eye, FolderPlus, FolderOpen, Save, BookOpen,
-  Activity, Play, AlertCircle, ToggleLeft, ToggleRight, Share2, Calendar, Clock, Database, BarChart2
-} from 'lucide-react';
+import { Sidebar } from '../components/Sidebar';
+import { ChatView } from '../components/ChatView';
+import { Composer } from '../components/Composer';
+import { RightPanel } from '../components/RightPanel';
+import { SettingsModal } from '../components/SettingsModal';
+import { SubViews } from '../components/SubViews';
+import { ArtifactsPanel } from './ArtifactsPanel';
+
 import { ollamaClient } from './ollama';
 import { 
   loadConversations, saveConversation, deleteConversation, loadMessages, saveMessage, 
@@ -14,8 +16,6 @@ import {
   saveUserMemory, loadUserMemory 
 } from './storage';
 import { OllamaModel, Conversation, ChatMessage, ModelPreset, RunningModel, Project, ProjectFile, Attachment } from './types';
-import { MarkdownRenderer } from './MarkdownRenderer';
-import { ArtifactsPanel } from './ArtifactsPanel';
 import { readTextOrFile } from './attachments';
 import { ingestProjectFile, queryRelevantChunks } from './rag';
 import { BUILTIN_TOOLS, executeToolLocally } from './agent';
@@ -23,6 +23,10 @@ import { getMcpServers, saveMcpServer, deleteMcpServer, connectMcpServer, execut
 import { getSchedules, saveSchedule, deleteSchedule, triggerNotification, SavedSchedule } from './scheduler';
 
 export default function Home() {
+  // Navigation states
+  const [activeTab, setActiveTab] = useState<'home' | 'code'>('home');
+  const [mainView, setMainView] = useState<'chat' | 'projects' | 'artifacts' | 'schedules'>('chat');
+
   // Connection & Models state
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [ollamaVersion, setOllamaVersion] = useState<string>('');
@@ -50,7 +54,6 @@ export default function Home() {
   // Projects & RAG
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-  const [showProjectsModal, setShowProjectsModal] = useState<boolean>(false);
   const [newProjectName, setNewProjectName] = useState<string>('');
   const [newProjectPrompt, setNewProjectPrompt] = useState<string>('');
   const [projectFilesList, setProjectFilesList] = useState<ProjectFile[]>([]);
@@ -58,7 +61,6 @@ export default function Home() {
 
   // Memory
   const [userMemoryText, setUserMemoryText] = useState<string>('');
-  const [showMemoryModal, setShowMemoryModal] = useState<boolean>(false);
 
   // Agent Mode config
   const [agentMode, setAgentMode] = useState<boolean>(false);
@@ -70,23 +72,16 @@ export default function Home() {
 
   // MCP Servers configurations
   const [mcpServers, setMcpServers] = useState<McpServerConfig[]>([]);
-  const [showMcpModal, setShowMcpModal] = useState<boolean>(false);
   const [newMcpName, setNewMcpName] = useState<string>('');
   const [newMcpCommand, setNewMcpCommand] = useState<string>('');
   const [newMcpArgs, setNewMcpArgs] = useState<string>('');
 
   // Schedules state
   const [schedulesList, setSchedulesList] = useState<SavedSchedule[]>([]);
-  const [showSchedulesModal, setShowSchedulesModal] = useState<boolean>(false);
   const [newSchedName, setNewSchedName] = useState<string>('');
   const [newSchedCron, setNewSchedCron] = useState<string>('');
   const [newSchedPrompt, setNewSchedPrompt] = useState<string>('');
   const [newSchedMode, setNewSchedMode] = useState<'chat' | 'agent'>('chat');
-
-  // Diagnostic Stats & Token window counters
-  const [showStatsModal, setShowStatsModal] = useState<boolean>(false);
-  const [totalTokensGenerated, setTotalTokensGenerated] = useState<number>(0);
-  const [tokensPerSecond, setTokensPerSecond] = useState<number>(0);
 
   // Model parameters / Settings state
   const [showSettings, setShowSettings] = useState<boolean>(false);
@@ -106,6 +101,16 @@ export default function Home() {
   });
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Providers list state variables
+  const [providersList, setProvidersList] = useState<any[]>([]);
+  const [activeProviderName, setActiveProviderName] = useState<string>('');
+  const [newProvName, setNewProvName] = useState<string>('');
+  const [newProvBaseUrl, setNewProvBaseUrl] = useState<string>('');
+  const [newProvApiKey, setNewProvApiKey] = useState<string>('');
+  const [newProvType, setNewProvType] = useState<'ollama' | 'openai-compatible'>('ollama');
+  const [showApiKey, setShowApiKey] = useState<boolean>(false);
+  const [showBrowserWarning, setShowBrowserWarning] = useState<boolean>(false);
 
   // 1. Initial health check & polling
   useEffect(() => {
@@ -151,21 +156,8 @@ export default function Home() {
       const activeP = providers[0];
       setActiveProviderName(activeP.name);
       ollamaClient.setProvider(activeP);
-
-      // Mock seed stats
-      setTotalTokensGenerated(Math.floor(Math.random() * 12500) + 4000);
-      setTokensPerSecond(Math.floor(Math.random() * 25) + 35);
     })();
   }, []);
-
-  const [providersList, setProvidersList] = useState<any[]>([]);
-  const [activeProviderName, setActiveProviderName] = useState<string>('');
-  const [newProvName, setNewProvName] = useState<string>('');
-  const [newProvBaseUrl, setNewProvBaseUrl] = useState<string>('');
-  const [newProvApiKey, setNewProvApiKey] = useState<string>('');
-  const [newProvType, setNewProvType] = useState<'ollama' | 'openai-compatible'>('ollama');
-  const [showApiKey, setShowApiKey] = useState<boolean>(false);
-  const [showBrowserWarning, setShowBrowserWarning] = useState<boolean>(false);
 
   // Background automation tick simulator checking schedules
   useEffect(() => {
@@ -227,7 +219,6 @@ export default function Home() {
     const list = await ollamaClient.listModels();
     setModels(list);
     if (list.length > 0) {
-      // Keep selected model if it exists in new list, otherwise fallback
       if (!list.some(m => m.name === selectedModel)) {
         setSelectedModel(list[0].name);
       }
@@ -272,7 +263,6 @@ export default function Home() {
     );
   }
 
-  // File upload change handler
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
@@ -286,12 +276,10 @@ export default function Home() {
     }
   }
 
-  // Remove attachment
   function removeAttachment(index: number) {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   }
 
-  // Ingest knowledge file for RAG project
   async function handleProjectFileAdd(e: React.ChangeEvent<HTMLInputElement>) {
     if (!activeProjectId || !e.target.files) return;
     const files = Array.from(e.target.files);
@@ -299,88 +287,42 @@ export default function Home() {
       try {
         const textData = await readTextOrFile(f);
         await ingestProjectFile(activeProjectId, f.name, textData.content, embeddingModel);
+        const list = await loadProjectFiles(activeProjectId);
+        setProjectFilesList(list);
       } catch (err) {
-        console.error('Project file ingestion failed:', err);
+        console.error('Failed to ingest file into project index:', err);
       }
     }
-    const updatedFiles = await loadProjectFiles(activeProjectId);
-    setProjectFilesList(updatedFiles);
   }
 
-  // Create Project
   async function handleCreateProject() {
     if (!newProjectName.trim()) return;
-    const newProj: Project = {
+    const project: Project = {
       id: 'proj_' + Date.now(),
       name: newProjectName.trim(),
       system_prompt: newProjectPrompt.trim(),
       created_at: Date.now(),
     };
-    await saveProject(newProj);
-    setProjects((prev) => [newProj, ...prev]);
-    setActiveProjectId(newProj.id);
+    await saveProject(project);
+    setProjects((prev) => [...prev, project]);
     setNewProjectName('');
     setNewProjectPrompt('');
+    setActiveProjectId(project.id);
   }
 
-  // Save memory updates
+  async function handleDeleteProject(id: string) {
+    if (confirm('Are you sure you want to delete this project?')) {
+      await deleteProject(id);
+      setProjects((prev) => prev.filter((p) => p.id !== id));
+      if (activeProjectId === id) {
+        setActiveProjectId(null);
+      }
+    }
+  }
+
   async function handleSaveMemory() {
     await saveUserMemory(userMemoryText);
-    setShowMemoryModal(false);
-  }
-
-  // MCP Server handlers
-  async function handleAddMcpServer() {
-    if (!newMcpName.trim() || !newMcpCommand.trim()) return;
-    const config: McpServerConfig = {
-      name: newMcpName.trim(),
-      command: newMcpCommand.trim(),
-      args: newMcpArgs.split(',').map((a) => a.trim()).filter(Boolean),
-      enabled: true,
-    };
-    saveMcpServer(config);
-    await connectMcpServer(config);
-    setMcpServers([...getMcpServers()]);
-    setNewMcpName('');
-    setNewMcpCommand('');
-    setNewMcpArgs('');
-  }
-
-  async function handleToggleMcpServer(server: McpServerConfig) {
-    const updated = { ...server, enabled: !server.enabled };
-    saveMcpServer(updated);
-    if (updated.enabled) {
-      await connectMcpServer(updated);
-    }
-    setMcpServers([...getMcpServers()]);
-  }
-
-  function handleDeleteMcpServer(name: string) {
-    deleteMcpServer(name);
-    setMcpServers([...getMcpServers()]);
-  }
-
-  // Schedule task handlers
-  function handleAddSchedule() {
-    if (!newSchedName.trim() || !newSchedPrompt.trim()) return;
-    const sched: SavedSchedule = {
-      id: 'sched_' + Date.now(),
-      name: newSchedName.trim(),
-      cronExpression: newSchedCron.trim() || 'daily',
-      prompt: newSchedPrompt.trim(),
-      model: selectedModel || 'qwen2.5:14b',
-      mode: newSchedMode,
-    };
-    saveSchedule(sched);
-    setSchedulesList([...getSchedules()]);
-    setNewSchedName('');
-    setNewSchedCron('');
-    setNewSchedPrompt('');
-  }
-
-  function handleDeleteSchedule(id: string) {
-    deleteSchedule(id);
-    setSchedulesList([...getSchedules()]);
+    alert('User Memory saved successfully!');
   }
 
   // LLM Providers Handlers
@@ -418,7 +360,6 @@ export default function Home() {
     await checkOllamaHealth();
   }
 
-  // Backup exporter utility
   function handleBackupExport() {
     const backupData = {
       conversations,
@@ -436,7 +377,6 @@ export default function Home() {
     URL.revokeObjectURL(url);
   }
 
-  // Backup importer utility
   async function handleBackupImport(e: React.ChangeEvent<HTMLInputElement>) {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
@@ -485,7 +425,6 @@ export default function Home() {
     }
   }
 
-  // Estimate total tokens in thread vs model context window
   function getEstimatedContextUsage() {
     const totalChars = messages.reduce((sum, m) => sum + m.content.length, 0) + input.length;
     const estTokens = Math.ceil(totalChars / 4);
@@ -493,6 +432,29 @@ export default function Home() {
       tokens: estTokens,
       pct: Math.min(100, Math.round((estTokens / activePreset.num_ctx) * 100))
     };
+  }
+
+  // Schedule task handlers
+  function handleAddSchedule() {
+    if (!newSchedName.trim() || !newSchedPrompt.trim()) return;
+    const sched: SavedSchedule = {
+      id: 'sched_' + Date.now(),
+      name: newSchedName.trim(),
+      cronExpression: newSchedCron.trim() || 'daily',
+      prompt: newSchedPrompt.trim(),
+      model: selectedModel || 'qwen2.5:14b',
+      mode: newSchedMode,
+    };
+    saveSchedule(sched);
+    setSchedulesList([...getSchedules()]);
+    setNewSchedName('');
+    setNewSchedCron('');
+    setNewSchedPrompt('');
+  }
+
+  function handleDeleteSchedule(id: string) {
+    deleteSchedule(id);
+    setSchedulesList([...getSchedules()]);
   }
 
   async function handleSendMessage() {
@@ -527,7 +489,6 @@ export default function Home() {
       }
     }
 
-    // Embed file attachments contents
     if (attachments.length > 0) {
       augmentedInput += `\n\n[Attached Files]:\n` + attachments.map((a) => `File: ${a.name}\nContent:\n${a.content}`).join('\n\n');
     }
@@ -559,8 +520,6 @@ export default function Home() {
     setMessages((prev) => [...prev, initialAssistantMsg]);
 
     const historyForOllama: { role: string; content: string }[] = [];
-    
-    // Inject memory and project prompts
     let systemPromptContent = activePreset.system_prompt;
     if (userMemoryText.trim()) {
       systemPromptContent += `\n[User Memory]:\n${userMemoryText}`;
@@ -581,7 +540,6 @@ export default function Home() {
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
-    // Handle normal chat mode vs Agent mode
     if (!agentMode) {
       let accumulatedText = '';
       try {
@@ -608,9 +566,6 @@ export default function Home() {
           model_used: selectedModel,
         };
         await saveMessage(finalAssistantMsg);
-        
-        // Update stats
-        setTotalTokensGenerated((prev) => prev + Math.ceil(accumulatedText.length / 4));
       } catch (e: any) {
         if (e.name !== 'AbortError') {
           const errMsgContent = accumulatedText + `\n\n*(Error: ${e.message || 'Stream interrupted'})*`;
@@ -641,7 +596,6 @@ export default function Home() {
         const maxIterations = 15;
         let finalResponseText = '';
 
-        // Query model details to inspect capabilities
         const modelInfo = await ollamaClient.showModelInfo(selectedModel || activeConv.model);
         const caps: string[] = modelInfo?.capabilities || [];
         const supportsTools = caps.includes('tools');
@@ -651,7 +605,6 @@ export default function Home() {
             ...prev,
             { step: `Selected model does not support native tools. Falling back to ReAct JSON instructions scaffold.`, type: 'call', timestamp: Date.now() }
           ]);
-          // Inject instructions to guide the model to output tools in JSON format
           const reactScaffoldPrompt = `
 You are running in ReAct fallback mode. You have access to the following tools:
 ${JSON.stringify(BUILTIN_TOOLS, null, 2)}
@@ -671,7 +624,6 @@ If you have completed your task, reply normally without any JSON block.
           currentMessages.push({ role: 'system', content: reactScaffoldPrompt });
         }
 
-        // Dynamically join Builtin Tools + loaded MCP tools
         const dynamicTools = [
           ...BUILTIN_TOOLS,
           ...getLoadedMcpTools().map((t) => ({
@@ -685,7 +637,6 @@ If you have completed your task, reply normally without any JSON block.
           iteration++;
           setAgentLogs((prev) => [...prev, { step: `Starting agent loop iteration ${iteration}`, type: 'call', timestamp: Date.now() }]);
 
-          // Send tools schema to Ollama API only if native tools are supported
           const response = await ollamaClient.streamChat(
             selectedModel || activeConv.model,
             currentMessages,
@@ -703,12 +654,10 @@ If you have completed your task, reply normally without any JSON block.
             );
           }
 
-          // Resolve tool call either natively or via ReAct JSON extraction
           let toolCallToRun: any = null;
           if (supportsTools && response.tool_calls && response.tool_calls.length > 0) {
             toolCallToRun = response.tool_calls[0];
           } else if (!supportsTools && response.content) {
-            // ReAct JSON block parsing
             const match = response.content.match(/```json\s*([\s\S]*?)\s*```/);
             if (match) {
               try {
@@ -739,7 +688,6 @@ If you have completed your task, reply normally without any JSON block.
               { step: `Model requested tool: ${name} with arguments: ${JSON.stringify(args)}`, type: 'call', timestamp: Date.now() }
             ]);
 
-            // Execute MCP tool or system builtin tool
             const isMcp = getLoadedMcpTools().some((t) => t.name === name);
             let toolOutput = '';
 
@@ -771,7 +719,6 @@ If you have completed your task, reply normally without any JSON block.
               { step: `Tool response: ${toolOutput}`, type: 'response', timestamp: Date.now() }
             ]);
 
-            // Append assistant tool request & response back to conversation history
             if (supportsTools) {
               currentMessages.push({ role: 'assistant', content: response.content || '', tool_calls: response.tool_calls } as any);
               currentMessages.push({ role: 'tool', content: toolOutput, name } as any);
@@ -780,25 +727,12 @@ If you have completed your task, reply normally without any JSON block.
               currentMessages.push({ role: 'user', content: `Tool execution response:\n${toolOutput}` });
             }
           } else {
-            // No tool calls returned. We've reached final text answer.
             setAgentLogs((prev) => [...prev, { step: `Agent finished execution loop successfully.`, type: 'response', timestamp: Date.now() }]);
             break;
           }
         }
-
-        const finalMsg: ChatMessage = {
-          id: assistantMsgId,
-          conversation_id: currentConvId,
-          role: 'assistant',
-          content: finalResponseText,
-          timestamp: Date.now(),
-          model_used: selectedModel,
-        };
-        await saveMessage(finalMsg);
-        setTotalTokensGenerated((prev) => prev + Math.ceil(finalResponseText.length / 4));
-
       } catch (e: any) {
-        setAgentLogs((prev) => [...prev, { step: `Error: ${e.message || 'Execution failed'}`, type: 'error', timestamp: Date.now() }]);
+        console.error('Agent loop failed:', e);
       } finally {
         setIsStreaming(false);
         abortControllerRef.current = null;
@@ -812,345 +746,163 @@ If you have completed your task, reply normally without any JSON block.
     }
   }
 
-  const contextUsage = getEstimatedContextUsage();
+  const activeConv = conversations.find((c) => c.id === activeConvId);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-zinc-900 text-zinc-100 font-sans">
-      {/* Safety Approval Overlays */}
-      {pendingApproval && (
-        <div className="fixed inset-0 bg-black/85 z-55 flex items-center justify-center p-6 backdrop-blur-md animate-fade-in">
-          <div className="bg-zinc-950 border-2 border-amber-600/40 rounded-xl w-full max-w-md p-6 flex flex-col gap-4 shadow-2xl">
-            <div className="flex items-center gap-2 text-amber-500">
-              <AlertCircle className="w-6 h-6 animate-pulse" />
-              <h3 className="font-bold text-lg">Local Execution Required</h3>
-            </div>
-            <div className="bg-zinc-900 p-4 rounded-lg border border-zinc-800 text-sm font-mono space-y-2">
-              <div><strong>Tool:</strong> {pendingApproval.name}</div>
-              <div><strong>Arguments:</strong></div>
-              <pre className="text-xs text-zinc-400 bg-black/40 p-2 rounded overflow-x-auto whitespace-pre-wrap">{JSON.stringify(pendingApproval.args, null, 2)}</pre>
-            </div>
-            <p className="text-xs text-zinc-400">Do you approve this local system action? Click execute to continue agentic loop execution.</p>
-            <div className="flex gap-3 justify-end mt-2">
-              <button onClick={pendingApproval.onReject} className="bg-zinc-800 hover:bg-zinc-700 px-4 py-2 rounded-lg text-sm font-semibold transition text-zinc-300">Reject</button>
-              <button onClick={pendingApproval.onApprove} className="bg-amber-600 hover:bg-amber-500 px-4 py-2 rounded-lg text-sm font-semibold transition text-white">Approve & Run</button>
-            </div>
-          </div>
-        </div>
-      )}
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+      {/* 1. Left Sidebar */}
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        conversations={conversations}
+        activeConvId={activeConvId}
+        setActiveConvId={setActiveConvId}
+        handleCreateNewChat={handleCreateNewChat}
+        handleTogglePin={handleTogglePin}
+        handleDeleteChat={handleDeleteChat}
+        isConnected={isConnected}
+        ollamaVersion={ollamaVersion}
+        activeProviderName={activeProviderName}
+        setShowSettings={setShowSettings}
+        mainView={mainView}
+        setMainView={setMainView}
+        setAgentMode={setAgentMode}
+        setShowLogsPanel={setShowLogsPanel}
+      />
 
-      {/* Health Status Banner */}
-      {isConnected === false && (
-        <div className="absolute top-0 left-0 right-0 z-50 bg-amber-600/90 backdrop-blur-md px-4 py-2 text-white flex items-center justify-between text-sm border-b border-amber-500">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-200" />
-            <span>Ollama server offline. Run <code className="bg-black/30 px-1.5 py-0.5 rounded font-mono">ollama serve</code> in your shell.</span>
-          </div>
-          <button onClick={checkOllamaHealth} className="flex items-center gap-1 bg-white/20 hover:bg-white/30 px-3 py-1 rounded transition text-xs font-semibold">
-            <RefreshCw className="w-3 h-3 animate-spin" /> Retry Connection
-          </button>
-        </div>
-      )}
-
-      {/* Left Sidebar */}
-      <aside className="w-64 bg-zinc-950 border-r border-zinc-800 flex flex-col justify-between p-3 shrink-0">
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between px-2 pt-1">
-            <div className="flex items-center gap-2 font-bold text-lg tracking-tight">
-              <Sparkles className="w-5 h-5 text-amber-500" />
-              <span>Laude</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <button onClick={() => setShowStatsModal(true)} className="p-1 rounded hover:bg-zinc-850 text-zinc-400" title="Performance stats">
-                <BarChart2 className="w-4 h-4" />
-              </button>
-              <button onClick={() => setShowMemoryModal(true)} className="p-1 rounded hover:bg-zinc-855 text-zinc-400" title="User Memory">
-                <BookOpen className="w-4 h-4" />
-              </button>
-              <button onClick={() => setShowProjectsModal(true)} className="p-1 rounded hover:bg-zinc-850 text-zinc-400" title="Projects (Local RAG)">
-                <FolderOpen className="w-4 h-4" />
-              </button>
-              <button onClick={() => setShowSchedulesModal(true)} className="p-1 rounded hover:bg-zinc-855 text-zinc-400" title="Schedules & Automations">
-                <Calendar className="w-4 h-4" />
-              </button>
-              <button onClick={() => setShowMcpModal(true)} className="p-1 rounded hover:bg-zinc-850 text-zinc-400" title="MCP Servers">
-                <Share2 className="w-4 h-4" />
-              </button>
-              <button onClick={() => setShowSettings(!showSettings)} className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400" title="Settings">
-                <Settings className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          <button onClick={handleCreateNewChat} className="flex items-center justify-center gap-2 w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-100 py-2 px-3 rounded-lg border border-zinc-700/50 transition font-medium text-sm">
-            <Plus className="w-4 h-4" /> New Chat
-          </button>
-
-          {/* Projects Switcher */}
-          {projects.length > 0 && (
-            <div className="px-2 py-1.5 bg-zinc-900/40 rounded-lg border border-zinc-855 flex flex-col gap-1.5">
-              <span className="text-[10px] font-semibold text-zinc-500 uppercase">Active Project</span>
-              <select
-                value={activeProjectId || ''}
-                onChange={(e) => setActiveProjectId(e.target.value || null)}
-                className="bg-zinc-950 border border-zinc-800 text-xs rounded p-1 text-zinc-300 w-full focus:outline-none"
-              >
-                <option value="">None (General Chat)</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Conversations List */}
-          <div className="flex flex-col gap-1 mt-2 overflow-y-auto max-h-[calc(100vh-320px)]">
-            <span className="text-[11px] font-semibold text-zinc-500 px-2 uppercase tracking-wider">Conversations</span>
-            {conversations.map((conv) => (
-              <div
-                key={conv.id}
-                onClick={() => setActiveConvId(conv.id)}
-                className={`group flex items-center justify-between px-2.5 py-2 rounded-lg text-sm cursor-pointer transition ${
-                  activeConvId === conv.id ? 'bg-zinc-800 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'
-                }`}
-              >
-                <div className="flex items-center gap-2 overflow-hidden">
-                  <MessageSquare className="w-4 h-4 shrink-0 text-zinc-500" />
-                  <span className="truncate">{conv.title}</span>
-                </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                  <button onClick={(e) => handleTogglePin(conv, e)} className={`p-1 hover:text-amber-400 transition ${conv.pinned ? 'text-amber-500 opacity-100' : ''}`}>
-                    <Pin className="w-3 h-3" />
-                  </button>
-                  <button onClick={(e) => handleDeleteChat(conv.id, e)} className="p-1 hover:text-red-400 transition">
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Connection status */}
-        <div className="border-t border-zinc-850 pt-3 px-2 flex items-center justify-between text-xs text-zinc-400">
-          <div className="flex items-center gap-2">
-            <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-            <span>{isConnected ? `Ollama v${ollamaVersion}` : 'Offline'}</span>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main chat interface */}
-      <main className="flex-1 flex flex-col justify-between bg-background relative min-w-0">
-        <header className="h-14 border-b border-border-color px-6 flex items-center justify-between bg-background/50 backdrop-blur shrink-0">
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-sidebar border border-border-color text-foreground opacity-80">
-              {activeProviderName}
-            </span>
-          </div>
-
-          {/* Toggle Agent mode vs normal chat */}
-          <div className="flex items-center gap-3 bg-sidebar border border-border-color rounded-lg px-3 py-1 text-xs">
-            <span className="font-semibold text-foreground/70 uppercase tracking-wider">Agent Mode</span>
-            <button 
-              onClick={() => {
-                const nextVal = !agentMode;
-                setAgentMode(nextVal);
-                if (nextVal) {
-                  const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ !== undefined;
-                  if (!isTauri) {
-                    setShowBrowserWarning(true);
-                  }
-                } else {
-                  setShowBrowserWarning(false);
-                }
-              }} 
-              className="text-accent hover:text-accent-hover transition"
-            >
-              {agentMode ? <ToggleRight className="w-7 h-7" /> : <ToggleLeft className="w-7 h-7 text-foreground/40" />}
-            </button>
-            {agentMode && (
-              <button onClick={() => setShowLogsPanel(!showLogsPanel)} className="p-1 hover:bg-background/80 rounded text-foreground/60" title="Toggle trace logs">
-                <Activity className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        </header>
-
-        {/* Message Thread */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          <div className="max-w-[48rem] mx-auto space-y-8">
-            {showBrowserWarning && (
-              <div className="bg-amber-600/10 border border-amber-600/30 rounded-xl p-4 text-xs text-amber-500 flex justify-between items-center gap-3">
-                <span>
-                  <strong>Warning:</strong> File/shell tools require the desktop app. Run <code>npm run tauri dev</code> to enable desktop execution context.
-                </span>
-                <button onClick={() => setShowBrowserWarning(false)} className="font-bold text-sm text-amber-500/70 hover:text-amber-500">×</button>
-              </div>
-            )}
-            {messages.length === 0 ? (
-              models.length === 0 ? (
-                <div className="h-[60vh] flex flex-col items-center justify-center text-center text-foreground/60 gap-4 max-w-md mx-auto">
-                  <Bot className="w-12 h-12 text-accent/60 animate-pulse" />
-                  <h2 className="text-xl font-serif text-foreground font-semibold">No chat model installed</h2>
-                  <p className="text-xs text-foreground/50">Pull a recommended model locally to start chat conversations offline.</p>
-                  <div className="flex flex-col gap-2 w-full mt-2">
-                    <button 
-                      onClick={() => { setPullModelInput('llama3.2:3b'); handlePullModel(); }}
-                      className="bg-accent hover:bg-accent-hover text-white text-xs py-2 px-3 rounded-lg transition font-medium"
-                    >
-                      Pull Llama 3.2 (3B - Fast)
-                    </button>
-                    <button 
-                      onClick={() => { setPullModelInput('qwen2.5:7b'); handlePullModel(); }}
-                      className="bg-accent hover:bg-accent-hover text-white text-xs py-2 px-3 rounded-lg transition font-medium"
-                    >
-                      Pull Qwen 2.5 (7B - Precise)
-                    </button>
-                    <button 
-                      onClick={() => { setPullModelInput('mistral:7b'); handlePullModel(); }}
-                      className="bg-accent hover:bg-accent-hover text-white text-xs py-2 px-3 rounded-lg transition font-medium"
-                    >
-                      Pull Mistral (7B - Creative)
-                    </button>
-                  </div>
-                  {pullProgress && (
-                    <div className="text-xs text-accent mt-2 font-mono">
-                      {pullProgress.status} {pullProgress.percent !== undefined ? `(${pullProgress.percent}%)` : ''}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="h-[60vh] flex flex-col items-center justify-center text-center text-foreground/60 gap-3">
-                  <Bot className="w-12 h-12 text-accent/80" />
-                  <h2 className="text-3xl font-serif text-foreground font-semibold">
-                    {(() => {
-                      const hr = new Date().getHours();
-                      if (hr < 12) return "Good morning";
-                      if (hr < 18) return "Good afternoon";
-                      return "Good evening";
-                    })()}
-                  </h2>
-                  <p className="text-sm text-foreground/60">How can Laude help you today?</p>
-                  {agentMode && (
-                    <div className="text-xs bg-accent/10 border border-accent/20 text-accent px-3 py-1.5 rounded-lg max-w-sm">
-                      Agent Mode activated. System tools (filesystem access, web fetches, and commands execution) will run locally on your system.
-                    </div>
-                  )}
-                </div>
-              )
-            ) : (
-              messages.map((msg) => (
-                <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                  {msg.role === 'assistant' && (
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-foreground/40 mb-1">
-                      {msg.model_used || selectedModel || 'Assistant'}
-                    </span>
-                  )}
-                  <div className={`text-sm leading-relaxed max-w-full whitespace-pre-wrap ${
-                    msg.role === 'user' ? 'bg-[#EEEDE4] text-[#3D3929] px-4 py-3 rounded-2xl border border-border-color' : 
-                    msg.content.includes('*(Error:') ? 'bg-rose-950/20 text-rose-300 px-4 py-3 rounded-2xl border border-rose-900/30' :
-                    'text-foreground'
-                  }`}>
-                    {msg.role === 'assistant' ? (
-                      msg.content === '' ? (
-                        <div className="flex items-center gap-1.5 py-1 text-accent font-mono text-xs">
-                          <span className="animate-bounce font-bold">●</span>
-                          <span className="animate-bounce delay-75 font-bold">●</span>
-                          <span className="animate-bounce delay-150 font-bold">●</span>
-                        </div>
-                      ) : (
-                        <MarkdownRenderer 
-                          content={msg.content} 
-                          onCodeBlockClick={(lang, code) => setSelectedArtifact({ language: lang, code })} 
-                        />
-                      )
-                    ) : (
-                      <span>{msg.content}</span>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-          <div ref={chatEndRef} />
-        </div>
-
-        {/* Input box */}
-        <div className="p-4 bg-background shrink-0">
-          {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 max-w-[48rem] mx-auto mb-3">
-              {attachments.map((a, idx) => (
-                <div key={idx} className="flex items-center gap-1.5 bg-sidebar border border-border-color px-3 py-1 rounded-full text-xs text-foreground/80">
-                  <span className="truncate max-w-[150px]">{a.name}</span>
-                  <button onClick={() => removeAttachment(idx)} className="text-foreground/60 hover:text-foreground font-bold">×</button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="max-w-[48rem] mx-auto flex flex-col bg-card-bg border border-border-color rounded-2xl p-3 shadow-sm focus-within:border-accent/40 relative">
-            <textarea
-              rows={2}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
-                }
-              }}
-              placeholder={agentMode ? "Provide a task for the Agent... (e.g. read package.json file)" : "Send message or upload code files..."}
-              className="w-full bg-transparent border-none text-foreground text-sm px-2 focus:outline-none resize-none min-h-[50px] py-1"
+      {/* 2. Main content view controller */}
+      <div className="flex-1 flex flex-col justify-between overflow-hidden relative">
+        {mainView === 'chat' ? (
+          <>
+            <ChatView
+              messages={messages}
+              selectedModel={selectedModel}
+              setSelectedModel={setSelectedModel}
+              models={models}
+              isConnected={isConnected}
+              onCodeBlockClick={(lang, code) => setSelectedArtifact({ language: lang, code })}
+              chatEndRef={chatEndRef}
+              isStreaming={isStreaming}
+              activeConvTitle={activeConv?.title || 'New Chat'}
+              handleCreateNewChat={handleCreateNewChat}
             />
 
-            <div className="flex justify-between items-center mt-2 pt-2 border-t border-border-color/30">
-              <div className="flex items-center gap-2">
-                <button onClick={() => fileInputRef.current?.click()} className="p-2 text-foreground/50 hover:text-foreground/80 transition" title="Add File / Image Attachment">
-                  <Paperclip className="w-4 h-4" />
-                </button>
-                <input type="file" ref={fileInputRef} onChange={handleFileChange} multiple className="hidden" />
+            <Composer
+              input={input}
+              setInput={setInput}
+              selectedModel={selectedModel}
+              setSelectedModel={setSelectedModel}
+              models={models}
+              activeProviderName={activeProviderName}
+              presets={presets}
+              activePreset={activePreset}
+              setActivePreset={setActivePreset}
+              agentMode={agentMode}
+              setAgentMode={setAgentMode}
+              attachments={attachments}
+              removeAttachment={removeAttachment}
+              fileInputRef={fileInputRef}
+              handleFileChange={handleFileChange}
+              handleSendMessage={handleSendMessage}
+              isStreaming={isStreaming}
+              handleStopStream={handleStopStream}
+              contextUsage={getEstimatedContextUsage()}
+              keepAlive={keepAlive}
+              projects={projects}
+              activeProjectId={activeProjectId}
+              setActiveProjectId={setActiveProjectId}
+              showBrowserWarning={showBrowserWarning}
+              setShowBrowserWarning={setShowBrowserWarning}
+            />
+          </>
+        ) : (
+          <SubViews
+            viewType={mainView as any}
+            projects={projects}
+            activeProjectId={activeProjectId}
+            setActiveProjectId={setActiveProjectId}
+            newProjectName={newProjectName}
+            setNewProjectName={setNewProjectName}
+            newProjectPrompt={newProjectPrompt}
+            setNewProjectPrompt={setNewProjectPrompt}
+            handleCreateProject={handleCreateProject}
+            handleDeleteProject={handleDeleteProject}
+            projectFilesList={projectFilesList}
+            handleProjectFileAdd={handleProjectFileAdd}
+            projectFileInputRef={projectFileInputRef}
+            schedulesList={schedulesList}
+            newSchedName={newSchedName}
+            setNewSchedName={setNewSchedName}
+            newSchedCron={newSchedCron}
+            setNewSchedCron={setNewSchedCron}
+            newSchedPrompt={newSchedPrompt}
+            setNewSchedPrompt={setNewSchedPrompt}
+            newSchedMode={newSchedMode}
+            setNewSchedMode={setNewSchedMode}
+            handleAddSchedule={handleAddSchedule}
+            handleDeleteSchedule={handleDeleteSchedule}
+            setSelectedArtifact={setSelectedArtifact}
+          />
+        )}
+      </div>
 
-                {/* Model picker inside the composer bottom left */}
-                <select
-                  value={selectedModel}
-                  onChange={(e) => setSelectedModel(e.target.value)}
-                  className="bg-transparent border border-border-color text-foreground/80 text-xs rounded-lg px-2.5 py-1 outline-none"
-                >
-                  {models.length === 0 ? (
-                    <option value="">No local models found</option>
-                  ) : (
-                    models.map((m) => (
-                      <option key={m.name} value={m.name}>
-                        {m.name}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
+      {/* 3. Right Collapsible logs panel */}
+      <RightPanel
+        agentLogs={agentLogs}
+        showLogsPanel={showLogsPanel}
+        setShowLogsPanel={setShowLogsPanel}
+        attachments={attachments}
+        projectFilesList={projectFilesList}
+        mcpServers={mcpServers}
+      />
 
-              {isStreaming ? (
-                <button onClick={handleStopStream} className="p-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition">
-                  <div className="w-3.5 h-3.5 bg-white rounded-xs" />
-                </button>
-              ) : (
-                <button onClick={handleSendMessage} disabled={!input.trim() && attachments.length === 0} className="p-2 bg-accent hover:bg-accent-hover disabled:opacity-40 text-white rounded-lg transition">
-                  <Send className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
+      {/* 4. Settings modal container */}
+      <SettingsModal
+        showSettings={showSettings}
+        setShowSettings={setShowSettings}
+        providersList={providersList}
+        activeProviderName={activeProviderName}
+        newProvName={newProvName}
+        setNewProvName={setNewProvName}
+        newProvBaseUrl={newProvBaseUrl}
+        setNewProvBaseUrl={setNewProvBaseUrl}
+        newProvApiKey={newProvApiKey}
+        setNewProvApiKey={setNewProvApiKey}
+        newProvType={newProvType}
+        setNewProvType={setNewProvType}
+        showApiKey={showApiKey}
+        setShowApiKey={setShowApiKey}
+        handleAddProvider={handleAddProvider}
+        handleDeleteProvider={handleDeleteProvider}
+        handleSelectProvider={handleSelectProvider}
+        baseUrl={baseUrl}
+        setBaseUrl={setBaseUrl}
+        keepAlive={keepAlive}
+        setKeepAlive={setKeepAlive}
+        embeddingModel={embeddingModel}
+        setEmbeddingModel={setEmbeddingModel}
+        pullModelInput={pullModelInput}
+        setPullModelInput={setPullModelInput}
+        pullProgress={pullProgress}
+        handlePullModel={handlePullModel}
+        models={models}
+        handleDeleteModel={handleDeleteModel}
+        runningModels={runningModels}
+        workspaceDir={workspaceDir}
+        setWorkspaceDir={setWorkspaceDir}
+        safetyLevel={safetyLevel}
+        setSafetyLevel={setSafetyLevel}
+        userMemoryText={userMemoryText}
+        setUserMemoryText={setUserMemoryText}
+        handleSaveMemory={handleSaveMemory}
+        presets={presets}
+        activePreset={activePreset}
+        setActivePreset={setActivePreset}
+        handleBackupExport={handleBackupExport}
+        handleBackupImport={handleBackupImport}
+      />
 
-          {/* Context Token usage indicator */}
-          <div className="max-w-[48rem] mx-auto flex items-center justify-between text-[10px] text-foreground/40 mt-2 px-1">
-            <span>Estimated context tokens: {contextUsage.tokens} / {activePreset.num_ctx}</span>
-            <div className="w-32 bg-border-color/40 h-1 rounded overflow-hidden">
-              <div className="bg-accent h-full" style={{ width: `${contextUsage.pct}%` }} />
-            </div>
-          </div>
-        </div>
-      </main>
-
-      {/* Side-by-side Artifacts panel */}
+      {/* 5. Floating Artifact side preview iframe */}
       {selectedArtifact && (
         <ArtifactsPanel
           language={selectedArtifact.language}
@@ -1159,570 +911,24 @@ If you have completed your task, reply normally without any JSON block.
         />
       )}
 
-      {/* Side-by-side Agent activity trace log panel */}
-      {agentMode && showLogsPanel && (
-        <div className="w-80 border-l border-zinc-850 bg-zinc-955 flex flex-col h-full shrink-0">
-          <div className="h-14 border-b border-zinc-800 px-4 flex items-center justify-between bg-zinc-900/50">
-            <span className="font-semibold text-xs text-zinc-200 flex items-center gap-1.5">
-              <Activity className="w-4 h-4 text-amber-500" /> Agent Tool Trace Log
-            </span>
-            <button onClick={() => setShowLogsPanel(false)} className="text-zinc-400 hover:text-white text-xl">×</button>
-          </div>
-          <div className="flex-1 p-4 overflow-y-auto space-y-4">
-            {agentLogs.length === 0 ? (
-              <div className="text-xs text-zinc-600 text-center py-10">No agent actions recorded in this step.</div>
-            ) : (
-              agentLogs.map((log, idx) => (
-                <div key={idx} className={`p-3 rounded-lg border text-xs leading-relaxed ${
-                  log.type === 'error' ? 'bg-rose-950/20 border-rose-900 text-rose-300' :
-                  log.type === 'response' ? 'bg-zinc-900 border-zinc-800 text-zinc-300' : 'bg-amber-600/10 border-amber-600/20 text-amber-400'
-                }`}>
-                  <div className="font-bold mb-1">{log.type.toUpperCase()} • {new Date(log.timestamp).toLocaleTimeString()}</div>
-                  <div className="whitespace-pre-wrap break-all font-mono">{log.step}</div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Memory Modal */}
-      {showMemoryModal && (
-        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-md p-6 flex flex-col gap-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-amber-500" /> Persistent Memory
-              </h3>
-              <button onClick={() => setShowMemoryModal(false)} className="text-zinc-400 hover:text-white text-xl">×</button>
+      {/* Pending user dangerous action approval modal */}
+      {pendingApproval && (
+        <div className="fixed inset-0 bg-black/75 z-55 flex items-center justify-center p-6 backdrop-blur-xs text-foreground text-xs">
+          <div className="bg-card-bg border border-border-color p-6 rounded-xl shadow-2xl max-w-sm space-y-4">
+            <h3 className="font-bold text-sm text-accent uppercase">Approve Action Request</h3>
+            <div>
+              <strong>Tool:</strong> <code>{pendingApproval.name}</code>
             </div>
-            <p className="text-xs text-zinc-400">Add details or context rules here. Laude automatically injects these into local LLM system prompts.</p>
-            <textarea
-              value={userMemoryText}
-              onChange={(e) => setUserMemoryText(e.target.value)}
-              rows={6}
-              placeholder="e.g. I prefer writing code in TypeScript, I work mostly on React frontend apps..."
-              className="bg-zinc-950 border border-zinc-850 rounded-lg p-3 text-sm focus:border-amber-500 outline-none resize-none text-zinc-200"
-            />
-            <button onClick={handleSaveMemory} className="bg-amber-600 hover:bg-amber-500 py-2 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2">
-              <Save className="w-4 h-4" /> Save Memory
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Projects / Local RAG Modal */}
-      {showProjectsModal && (
-        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-855 rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden">
-            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                <FolderOpen className="w-5 h-5 text-amber-500" /> Projects & Local Knowledge Base
-              </h3>
-              <button onClick={() => setShowProjectsModal(false)} className="text-zinc-400 hover:text-white text-xl">×</button>
-            </div>
-
-            <div className="p-6 overflow-y-auto space-y-6 flex-1">
-              {/* Create new project */}
-              <div className="bg-zinc-950 p-4 rounded-lg border border-zinc-850 space-y-3">
-                <h4 className="text-sm font-semibold text-zinc-300">Create New Project</h4>
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    value={newProjectName}
-                    onChange={(e) => setNewProjectName(e.target.value)}
-                    placeholder="Project Name"
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-1.5 text-sm outline-none focus:border-amber-500 text-zinc-200"
-                  />
-                  <textarea
-                    value={newProjectPrompt}
-                    onChange={(e) => setNewProjectPrompt(e.target.value)}
-                    placeholder="Project Custom System Prompt (rules, instructions...)"
-                    rows={2}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-1.5 text-sm outline-none focus:border-amber-500 resize-none text-zinc-200"
-                  />
-                  <button onClick={handleCreateProject} className="bg-zinc-800 hover:bg-zinc-700 px-4 py-1.5 rounded text-xs font-semibold transition">
-                    Create Project
-                  </button>
-                </div>
-              </div>
-
-              {/* List of projects & files */}
-              {projects.length > 0 && (
-                <div className="space-y-4">
-                  <h4 className="text-sm font-semibold text-zinc-300">Manage Project Knowledge</h4>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="col-span-1 border border-zinc-800 rounded-lg p-2 flex flex-col gap-1 max-h-48 overflow-y-auto bg-zinc-950">
-                      {projects.map((p) => (
-                        <div
-                          key={p.id}
-                          onClick={() => setActiveProjectId(p.id)}
-                          className={`p-2 rounded text-xs cursor-pointer transition truncate ${
-                            activeProjectId === p.id ? 'bg-amber-600/20 text-amber-400 font-semibold' : 'text-zinc-400 hover:bg-zinc-900'
-                          }`}
-                        >
-                          {p.name}
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="col-span-2 border border-zinc-800 rounded-lg p-3 flex flex-col justify-between max-h-48 bg-zinc-950">
-                      {activeProjectId ? (
-                        <>
-                          <div className="space-y-2 overflow-y-auto flex-1 mb-2">
-                            <span className="text-[10px] text-zinc-500 uppercase font-semibold">Knowledge Files</span>
-                            {projectFilesList.length === 0 ? (
-                              <div className="text-xs text-zinc-600">No knowledge files uploaded.</div>
-                            ) : (
-                              projectFilesList.map((pf) => (
-                                <div key={pf.id} className="text-xs text-zinc-300 flex items-center justify-between border-b border-zinc-900 py-1">
-                                  <span className="truncate">{pf.name}</span>
-                                  <span className="text-[10px] text-zinc-500">{(pf.size / 1024).toFixed(1)} KB</span>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                          <div>
-                            <button onClick={() => projectFileInputRef.current?.click()} className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded text-xs font-semibold transition">
-                              Add Knowledge File
-                            </button>
-                            <input type="file" ref={projectFileInputRef} onChange={handleProjectFileAdd} className="hidden" />
-                          </div>
-                        </>
-                      ) : (
-                        <div className="text-xs text-zinc-500 h-full flex items-center justify-center">Select a project on the left to manage files.</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Schedules & Automations Modal */}
-      {showSchedulesModal && (
-        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-850 rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden">
-            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-amber-500" /> Scheduled Automations
-              </h3>
-              <button onClick={() => setShowSchedulesModal(false)} className="text-zinc-400 hover:text-white text-xl">×</button>
-            </div>
-
-            <div className="p-6 overflow-y-auto space-y-6 flex-1">
-              <div className="bg-zinc-950 p-4 rounded-lg border border-zinc-850 space-y-3">
-                <h4 className="text-xs font-semibold text-zinc-300">Create New Automation Task</h4>
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    value={newSchedName}
-                    onChange={(e) => setNewSchedName(e.target.value)}
-                    placeholder="Task Name (e.g. Daily Digest)"
-                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none focus:border-amber-500 text-zinc-200"
-                  />
-                  <input
-                    type="text"
-                    value={newSchedCron}
-                    onChange={(e) => setNewSchedCron(e.target.value)}
-                    placeholder="Cron Expression or Preset (daily/hourly)"
-                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none focus:border-amber-500 text-zinc-200"
-                  />
-                  <textarea
-                    value={newSchedPrompt}
-                    onChange={(e) => setNewSchedPrompt(e.target.value)}
-                    placeholder="Automation prompt to run..."
-                    rows={2}
-                    className="col-span-2 bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none focus:border-amber-500 resize-none text-zinc-200"
-                  />
-                  <div className="col-span-2 flex items-center gap-3">
-                    <span className="text-xs text-zinc-400">Execution Mode:</span>
-                    <select
-                      value={newSchedMode}
-                      onChange={(e) => setNewSchedMode(e.target.value as any)}
-                      className="bg-zinc-900 border border-zinc-800 text-xs rounded p-1 text-zinc-300"
-                    >
-                      <option value="chat">Chat Mode</option>
-                      <option value="agent">Agent Mode</option>
-                    </select>
-                  </div>
-                </div>
-                <button onClick={handleAddSchedule} className="bg-amber-600 hover:bg-amber-500 text-xs font-bold px-4 py-1.5 rounded transition">
-                  Create Automation
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-zinc-300">Active Schedules</h4>
-                {schedulesList.length === 0 ? (
-                  <div className="text-xs text-zinc-500">No automation schedules created. Tasks run periodically in the background.</div>
-                ) : (
-                  <div className="space-y-2">
-                    {schedulesList.map((sc) => (
-                      <div key={sc.id} className="flex items-center justify-between bg-zinc-955 p-3 rounded-lg border border-zinc-850 text-xs">
-                        <div>
-                          <div className="font-semibold text-zinc-200">{sc.name}</div>
-                          <div className="text-[10px] text-zinc-500 mt-1 font-mono">
-                            Cron: {sc.cronExpression} | Prompt: "{sc.prompt.slice(0, 30)}..."
-                          </div>
-                          {sc.lastRunTime && (
-                            <div className="text-[10px] text-amber-500 flex items-center gap-1 mt-1">
-                              <Clock className="w-3 h-3" /> Last Run: {new Date(sc.lastRunTime).toLocaleTimeString()} ({sc.lastRunStatus})
-                            </div>
-                          )}
-                        </div>
-                        <button onClick={() => handleDeleteSchedule(sc.id)} className="text-rose-400 hover:bg-rose-955/50 p-1.5 rounded transition">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Performance Stats Modal */}
-      {showStatsModal && (
-        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-850 rounded-xl w-full max-w-md p-6 flex flex-col gap-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                <BarChart2 className="w-5 h-5 text-amber-500" /> Local System Performance
-              </h3>
-              <button onClick={() => setShowStatsModal(false)} className="text-zinc-400 hover:text-white text-xl">×</button>
-            </div>
-            
-            <div className="space-y-4 py-2">
-              <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-850 flex justify-between items-center">
-                <span className="text-xs text-zinc-400">Total Local Tokens Generated:</span>
-                <span className="font-mono text-sm font-semibold text-amber-400">{totalTokensGenerated} tokens</span>
-              </div>
-              <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-850 flex justify-between items-center">
-                <span className="text-xs text-zinc-400">Average Inference Speed:</span>
-                <span className="font-mono text-sm font-semibold text-amber-400">{tokensPerSecond} tok/sec</span>
-              </div>
-              <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-850 flex justify-between items-center">
-                <span className="text-xs text-zinc-400">Active Keep-alive Duration:</span>
-                <span className="font-mono text-sm font-semibold text-zinc-200">{keepAlive}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MCP Servers Manager Modal */}
-      {showMcpModal && (
-        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-850 rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden">
-            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                <Share2 className="w-5 h-5 text-amber-500" /> Model Context Protocol (MCP) Servers
-              </h3>
-              <button onClick={() => setShowMcpModal(false)} className="text-zinc-400 hover:text-white text-xl">×</button>
-            </div>
-
-            <div className="p-6 overflow-y-auto space-y-6 flex-1">
-              <div className="bg-zinc-950 p-4 rounded-lg border border-zinc-850 space-y-3">
-                <h4 className="text-xs font-semibold text-zinc-300">Add stdio MCP Server</h4>
-                <div className="grid grid-cols-3 gap-2">
-                  <input
-                    type="text"
-                    value={newMcpName}
-                    onChange={(e) => setNewMcpName(e.target.value)}
-                    placeholder="Server Name (e.g. github)"
-                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none focus:border-amber-500 text-zinc-200"
-                  />
-                  <input
-                    type="text"
-                    value={newMcpCommand}
-                    onChange={(e) => setNewMcpCommand(e.target.value)}
-                    placeholder="Command (e.g. node)"
-                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none focus:border-amber-500 text-zinc-200"
-                  />
-                  <input
-                    type="text"
-                    value={newMcpArgs}
-                    onChange={(e) => setNewMcpArgs(e.target.value)}
-                    placeholder="Args (comma separated)"
-                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none focus:border-amber-500 text-zinc-200"
-                  />
-                </div>
-                <button onClick={handleAddMcpServer} className="bg-amber-600 hover:bg-amber-500 text-xs font-bold px-4 py-1.5 rounded transition">
-                  Connect Server
-                </button>
-              </div>
-
-              {/* Active MCP Servers list */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-zinc-300">Connected MCP Endpoints</h4>
-                {mcpServers.length === 0 ? (
-                  <div className="text-xs text-zinc-500">No MCP servers registered. Registered servers expose tools directly to LLM in Agent Mode.</div>
-                ) : (
-                  <div className="space-y-2">
-                    {mcpServers.map((srv) => (
-                      <div key={srv.name} className="flex items-center justify-between bg-zinc-950 p-3 rounded-lg border border-zinc-855 text-xs">
-                        <div>
-                          <div className="font-semibold text-zinc-200">{srv.name}</div>
-                          <div className="text-[10px] text-zinc-500 font-mono mt-0.5">{srv.command} {srv.args.join(' ')}</div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => handleToggleMcpServer(srv)}
-                            className={`px-3 py-1 rounded text-[10px] font-bold ${
-                              srv.enabled ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/20' : 'bg-zinc-850 text-zinc-500 border border-zinc-800'
-                            }`}
-                          >
-                            {srv.enabled ? 'Enabled' : 'Disabled'}
-                          </button>
-                          <button onClick={() => handleDeleteMcpServer(srv.name)} className="text-rose-400 hover:bg-rose-950/40 p-1.5 rounded transition">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Settings Modal */}
-      {showSettings && (
-        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl">
-            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                <Sliders className="w-5 h-5 text-amber-500" /> Settings & Model Management
-              </h3>
-              <button onClick={() => setShowSettings(false)} className="text-zinc-400 hover:text-white text-xl">×</button>
-            </div>
-
-            <div className="p-6 overflow-y-auto space-y-6">
-              {/* Providers Configuration */}
-              <div className="bg-zinc-950 p-4 rounded-lg border border-zinc-850 space-y-4">
-                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                  <Server className="w-4 h-4 text-amber-500" /> LLM API Providers
-                </label>
-                <div className="space-y-3">
-                  <div className="flex gap-2 items-center">
-                    <span className="text-xs text-zinc-400">Active Provider:</span>
-                    <select
-                      value={activeProviderName}
-                      onChange={(e) => {
-                        const target = providersList.find(p => p.name === e.target.value);
-                        if (target) handleSelectProvider(target);
-                      }}
-                      className="bg-zinc-900 border border-zinc-800 text-xs rounded px-2 py-1 text-zinc-300 focus:outline-none"
-                    >
-                      {providersList.map((p) => (
-                        <option key={p.name} value={p.name}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="border-t border-zinc-800 pt-3 space-y-2">
-                    <h4 className="text-xs font-semibold text-zinc-300">Add New Provider</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="text"
-                        value={newProvName}
-                        onChange={(e) => setNewProvName(e.target.value)}
-                        placeholder="Provider Name (e.g. OpenRouter)"
-                        className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none text-zinc-200"
-                      />
-                      <input
-                        type="text"
-                        value={newProvBaseUrl}
-                        onChange={(e) => setNewProvBaseUrl(e.target.value)}
-                        placeholder="Base URL"
-                        className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none text-zinc-200"
-                      />
-                      <div className="col-span-2 flex gap-2">
-                        <select
-                          value={newProvType}
-                          onChange={(e) => setNewProvType(e.target.value as any)}
-                          className="bg-zinc-900 border border-zinc-800 text-xs rounded p-2 text-zinc-300"
-                        >
-                          <option value="ollama">Ollama</option>
-                          <option value="openai-compatible">OpenAI Compatible</option>
-                        </select>
-                        {newProvType === 'openai-compatible' && (
-                          <div className="flex-1 flex gap-2">
-                            <input
-                              type={showApiKey ? "text" : "password"}
-                              value={newProvApiKey}
-                              onChange={(e) => setNewProvApiKey(e.target.value)}
-                              placeholder="API Key"
-                              className="flex-1 bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none text-zinc-200"
-                            />
-                            <button
-                              onClick={() => setShowApiKey(!showApiKey)}
-                              type="button"
-                              className="bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs px-2 rounded border border-zinc-700"
-                            >
-                              {showApiKey ? "Hide" : "Show"}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <button onClick={handleAddProvider} className="bg-amber-600 hover:bg-amber-500 text-xs font-bold px-4 py-1.5 rounded transition">
-                      Add Provider
-                    </button>
-                  </div>
-
-                  <div className="space-y-1.5 border-t border-zinc-800 pt-3">
-                    <span className="text-[10px] font-semibold text-zinc-500 uppercase">Provider List</span>
-                    {providersList.map((p) => (
-                      <div key={p.name} className="flex justify-between items-center text-xs bg-zinc-900 p-2 rounded border border-zinc-850">
-                        <div>
-                          <span className="font-semibold text-zinc-300">{p.name}</span>
-                          <span className="text-[10px] text-zinc-500 block">{p.baseUrl} ({p.type})</span>
-                        </div>
-                        {p.name !== 'Ollama (Local)' && (
-                          <button onClick={() => handleDeleteProvider(p.name)} className="text-rose-400 hover:bg-rose-950/40 p-1.5 rounded transition">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Base Connection URL</label>
-                <input
-                  type="text"
-                  value={baseUrl}
-                  onChange={(e) => setBaseUrl(e.target.value)}
-                  className="w-full bg-zinc-955 border border-zinc-855 rounded-lg px-3 py-2 text-sm focus:border-amber-500 outline-none text-zinc-200"
-                />
-              </div>
-
-              {/* Backup Exporter & Importer */}
-              <div className="bg-zinc-950 p-4 rounded-lg border border-zinc-850 space-y-2">
-                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                  <Database className="w-4 h-4 text-amber-500" /> Local Database & Config Backup
-                </label>
-                <p className="text-xs text-zinc-500">Download or recover conversation threads, MCP configurations, custom memory files, and parameter profiles as a JSON bundle.</p>
-                <div className="flex gap-3">
-                  <button onClick={handleBackupExport} className="bg-zinc-800 hover:bg-zinc-700 text-xs px-4 py-2 rounded-lg font-semibold transition text-zinc-300">
-                    Export Backup File
-                  </button>
-                  <label className="bg-zinc-800 hover:bg-zinc-700 text-xs px-4 py-2 rounded-lg font-semibold transition text-zinc-300 cursor-pointer">
-                    Import Backup File
-                    <input type="file" onChange={handleBackupImport} accept=".json" className="hidden" />
-                  </label>
-                </div>
-              </div>
-
-              {/* Agent Settings (Workspace Dir & Safety Level) */}
-              <div className="grid grid-cols-2 gap-4 border-t border-zinc-800 pt-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider font-mono">Agent Workspace Dir</label>
-                  <input
-                    type="text"
-                    value={workspaceDir}
-                    onChange={(e) => setWorkspaceDir(e.target.value)}
-                    className="w-full bg-zinc-955 border border-zinc-855 rounded-lg px-3 py-2 text-xs focus:border-amber-500 outline-none text-zinc-200 font-mono"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Agent Permission Safety Level</label>
-                  <select
-                    value={safetyLevel}
-                    onChange={(e) => setSafetyLevel(e.target.value as any)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs focus:border-amber-500 outline-none text-zinc-200"
-                  >
-                    <option value="yolo">YOLO (Auto-approve everything)</option>
-                    <option value="ask_dangerous">Ask for Dangerous Only (e.g. write, shell)</option>
-                    <option value="ask_always">Ask Always (Prompt every action)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Embedding Model (For Projects/RAG)</label>
-                <input
-                  type="text"
-                  value={embeddingModel}
-                  onChange={(e) => setEmbeddingModel(e.target.value)}
-                  className="w-full bg-zinc-955 border border-zinc-850 rounded-lg px-3 py-2 text-sm focus:border-amber-500 outline-none text-zinc-200"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Pull New Model</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={pullModelInput}
-                    onChange={(e) => setPullModelInput(e.target.value)}
-                    placeholder="e.g. nomic-embed-text, qwen2.5:14b..."
-                    className="flex-1 bg-zinc-955 border border-zinc-855 rounded-lg px-3 py-2 text-sm focus:border-amber-500 outline-none text-zinc-200"
-                  />
-                  <button onClick={handlePullModel} className="bg-amber-600 hover:bg-amber-500 px-4 py-2 rounded-lg text-sm font-medium transition">Pull</button>
-                </div>
-                {pullProgress && (
-                  <div className="text-xs text-amber-400 mt-1">
-                    {pullProgress.status} {pullProgress.percent !== undefined ? `(${pullProgress.percent}%)` : ''}
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Installed Local Models</label>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {models.map((m) => (
-                    <div key={m.name} className="flex items-center justify-between bg-zinc-955 p-3 rounded-lg border border-zinc-855 text-sm">
-                      <div>
-                        <div className="font-medium text-zinc-200">{m.name}</div>
-                        <div className="text-xs text-zinc-500">
-                          Size: {(m.size / (1024 * 1024 * 1024)).toFixed(2)} GB | Params: {m.details?.parameter_size || 'N/A'}
-                        </div>
-                      </div>
-                      <button onClick={() => handleDeleteModel(m.name)} className="text-rose-400 hover:bg-rose-955/50 p-1.5 rounded transition">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-4 border-t border-zinc-800 pt-4">
-                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Inference Parameters (Profile)</label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-xs text-zinc-400">Temperature: {activePreset.temperature}</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={activePreset.temperature}
-                      onChange={(e) => setActivePreset({ ...activePreset, temperature: parseFloat(e.target.value) })}
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <span className="text-xs text-zinc-400">Context Window (num_ctx): {activePreset.num_ctx}</span>
-                    <input
-                      type="number"
-                      value={activePreset.num_ctx}
-                      onChange={(e) => setActivePreset({ ...activePreset, num_ctx: parseInt(e.target.value) || 2048 })}
-                      className="w-full bg-zinc-950 border border-zinc-850 rounded px-2 py-1 text-sm text-zinc-200"
-                    />
-                  </div>
-                </div>
-              </div>
+            <pre className="p-2 bg-sidebar border border-border-color rounded text-[10px] overflow-auto max-h-32 font-mono">
+              {JSON.stringify(pendingApproval.args, null, 2)}
+            </pre>
+            <div className="flex gap-2 justify-end pt-2">
+              <button onClick={pendingApproval.onReject} className="px-3 py-1.5 border border-border-color rounded hover:bg-sidebar transition">
+                Deny
+              </button>
+              <button onClick={pendingApproval.onApprove} className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded font-bold transition">
+                Approve
+              </button>
             </div>
           </div>
         </div>
