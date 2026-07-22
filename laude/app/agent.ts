@@ -77,25 +77,80 @@ export async function executeToolLocally(
   workspacePath: string,
   safetyLevel: 'yolo' | 'ask_dangerous' | 'ask_always'
 ): Promise<string> {
+  const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ !== undefined;
+
   switch (name) {
     case 'read_file': {
-      // In web fallback, we return a mock success message, or implement mock filesystem.
-      return `[read_file] Successfully read content of ${args.path}. (Local mock filesystem response for safety)`;
+      const targetPath = args.path.startsWith('/') || args.path.includes(':') 
+        ? args.path 
+        : `${workspacePath}/${args.path}`;
+      if (isTauri) {
+        try {
+          const { readTextFile } = await import('@tauri-apps/plugin-fs');
+          const data = await readTextFile(targetPath);
+          return data;
+        } catch (e: any) {
+          return `Error reading file at ${targetPath}: ${e.message || e}`;
+        }
+      }
+      return `[read_file Mock] Successfully read content of ${targetPath}. (Running in Web environment)`;
     }
     case 'write_file': {
-      return `[write_file] Successfully written contents to file at ${args.path}.`;
+      const targetPath = args.path.startsWith('/') || args.path.includes(':') 
+        ? args.path 
+        : `${workspacePath}/${args.path}`;
+      if (isTauri) {
+        try {
+          const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+          await writeTextFile(targetPath, args.content);
+          return `File written successfully to ${targetPath}`;
+        } catch (e: any) {
+          return `Error writing file at ${targetPath}: ${e.message || e}`;
+        }
+      }
+      return `[write_file Mock] Successfully wrote content to ${targetPath}.`;
     }
     case 'list_dir': {
-      return `[list_dir] Folder contents of ${args.path}: \n- package.json\n- app/\n- src-tauri/`;
+      const targetPath = args.path.startsWith('/') || args.path.includes(':') 
+        ? args.path 
+        : `${workspacePath}/${args.path}`;
+      if (isTauri) {
+        try {
+          const { readDir } = await import('@tauri-apps/plugin-fs');
+          const entries = await readDir(targetPath);
+          const formatted = entries.map(entry => {
+            const typeStr = entry.isDirectory ? '[DIR]' : '[FILE]';
+            return `${typeStr} ${entry.name}`;
+          }).join('\n');
+          return formatted || '(directory is empty)';
+        } catch (e: any) {
+          return `Error listing directory at ${targetPath}: ${e.message || e}`;
+        }
+      }
+      return `[list_dir Mock] Folder contents of ${targetPath}: \n- package.json\n- app/\n- src-tauri/`;
     }
     case 'run_shell': {
-      return `[run_shell] Command "${args.command}" executed successfully. Output: \nDone.`;
+      if (isTauri) {
+        try {
+          // Standardise executing shell parameters via CMD in Windows
+          const cmdInstance = Command.create('cmd', ['/c', args.command]);
+          const output = await cmdInstance.execute();
+          if (output.code === 0) {
+            return output.stdout;
+          } else {
+            return `Shell execution failed with exit code ${output.code}.\nStderr: ${output.stderr}\nStdout: ${output.stdout}`;
+          }
+        } catch (e: any) {
+          return `Shell execution error: ${e.message || e}`;
+        }
+      }
+      return `[run_shell Mock] Command "${args.command}" execution mocked successfully.`;
     }
     case 'web_fetch': {
       try {
         const response = await fetch(args.url);
         const text = await response.text();
-        return `[web_fetch] Fetched content from ${args.url}:\n${text.slice(0, 500)}...`;
+        return `[web_fetch] Fetched content from ${args.url}:\n${text.slice(0, 1000)}...`;
       } catch (e: any) {
         return `[web_fetch] Failed fetching page: ${e.message}`;
       }

@@ -13,6 +13,7 @@ pub fn run() {
       }
       app.handle().plugin(tauri_plugin_sql::Builder::default().build())?;
       app.handle().plugin(tauri_plugin_shell::init())?;
+      app.handle().plugin(tauri_plugin_fs::init())?;
       app.handle().plugin(tauri_plugin_notification::init())?;
       app.handle().plugin(tauri_plugin_global_shortcut::Builder::new().build())?;
 

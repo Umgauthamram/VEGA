@@ -10,7 +10,37 @@
     "sql:default",
     "sql:allow-execute",
     "shell:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "cmd": "cmd",
+          "args": true
+        },
+        {
+          "cmd": "powershell",
+          "args": true
+        }
+      ]
+    },
     "notification:default",
-    "global-shortcut:default"
+    "global-shortcut:default",
+    "fs:default",
+    {
+      "identifier": "fs:allow-read-recursive",
+      "allow": [
+        {
+          "path": "**"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:allow-write-recursive",
+      "allow": [
+        {
+          "path": "**"
+        }
+      ]
+    }
   ]
 }
