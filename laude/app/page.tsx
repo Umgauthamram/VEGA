@@ -508,7 +508,9 @@ export default function Home() {
     }
 
     historyForOllama.push({ role: 'system', content: systemPromptContent });
-    messages.forEach((m) => historyForOllama.push({ role: m.role, content: m.content }));
+    messages.forEach((m) => {
+      historyForOllama.push({ role: m.role, content: m.content });
+    });
     historyForOllama.push({ role: 'user', content: augmentedInput });
 
     const abortController = new AbortController();
