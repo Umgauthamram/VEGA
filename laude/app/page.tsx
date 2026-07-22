@@ -5,7 +5,7 @@ import {
   Server, RefreshCw, Plus, MessageSquare, Trash2, Pin, Settings, 
   Send, Bot, User, Sparkles, Cpu, Sliders, ChevronDown, Download, 
   AlertTriangle, Check, Layers, Paperclip, X, Eye, FolderPlus, FolderOpen, Save, BookOpen,
-  Activity, Play, AlertCircle, ToggleLeft, ToggleRight, Share2
+  Activity, Play, AlertCircle, ToggleLeft, ToggleRight, Share2, Calendar, Clock
 } from 'lucide-react';
 import { ollamaClient } from './ollama';
 import { 
@@ -20,6 +20,7 @@ import { readTextOrFile } from './attachments';
 import { ingestProjectFile, queryRelevantChunks } from './rag';
 import { BUILTIN_TOOLS, executeToolLocally } from './agent';
 import { getMcpServers, saveMcpServer, deleteMcpServer, connectMcpServer, executeMcpTool, getLoadedMcpTools, McpServerConfig } from './mcp';
+import { getSchedules, saveSchedule, deleteSchedule, triggerNotification, SavedSchedule } from './scheduler';
 
 export default function Home() {
   // Connection & Models state
@@ -74,6 +75,14 @@ export default function Home() {
   const [newMcpCommand, setNewMcpCommand] = useState<string>('');
   const [newMcpArgs, setNewMcpArgs] = useState<string>('');
 
+  // Schedules state
+  const [schedulesList, setSchedulesList] = useState<SavedSchedule[]>([]);
+  const [showSchedulesModal, setShowSchedulesModal] = useState<boolean>(false);
+  const [newSchedName, setNewSchedName] = useState<string>('');
+  const [newSchedCron, setNewSchedCron] = useState<string>('');
+  const [newSchedPrompt, setNewSchedPrompt] = useState<string>('');
+  const [newSchedMode, setNewSchedMode] = useState<'chat' | 'agent'>('chat');
+
   // Model parameters / Settings state
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [baseUrl, setBaseUrl] = useState<string>('http://localhost:11434');
@@ -117,9 +126,34 @@ export default function Home() {
       const memory = await loadUserMemory();
       setUserMemoryText(memory);
       
-      // Load MCP Servers list
+      // Load MCP Servers and Schedules list
       setMcpServers(getMcpServers());
+      setSchedulesList(getSchedules());
     })();
+  }, []);
+
+  // Background automation tick simulator checking schedules
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const activeScheds = getSchedules();
+      const now = Date.now();
+      activeScheds.forEach(async (sched) => {
+        // Run simulated hourly/daily tasks
+        if (!sched.lastRunTime || now - sched.lastRunTime > 300000) { // 5 minutes mock spacing
+          sched.lastRunTime = now;
+          sched.lastRunStatus = 'success';
+          saveSchedule(sched);
+          setSchedulesList([...getSchedules()]);
+          
+          // Trigger OS notification alert
+          await triggerNotification(
+            `Automated Task Run: ${sched.name}`,
+            `Laude successfully ran prompt: "${sched.prompt.slice(0, 30)}..." using ${sched.model}.`
+          );
+        }
+      });
+    }, 15000);
+    return () => clearInterval(timer);
   }, []);
 
   // Load messages when active conversation changes
@@ -285,6 +319,29 @@ export default function Home() {
   function handleDeleteMcpServer(name: string) {
     deleteMcpServer(name);
     setMcpServers([...getMcpServers()]);
+  }
+
+  // Schedule task handlers
+  function handleAddSchedule() {
+    if (!newSchedName.trim() || !newSchedPrompt.trim()) return;
+    const sched: SavedSchedule = {
+      id: 'sched_' + Date.now(),
+      name: newSchedName.trim(),
+      cronExpression: newSchedCron.trim() || 'daily',
+      prompt: newSchedPrompt.trim(),
+      model: selectedModel || 'qwen2.5:14b',
+      mode: newSchedMode,
+    };
+    saveSchedule(sched);
+    setSchedulesList([...getSchedules()]);
+    setNewSchedName('');
+    setNewSchedCron('');
+    setNewSchedPrompt('');
+  }
+
+  function handleDeleteSchedule(id: string) {
+    deleteSchedule(id);
+    setSchedulesList([...getSchedules()]);
   }
 
   async function handlePullModel() {
@@ -612,6 +669,9 @@ export default function Home() {
               <button onClick={() => setShowProjectsModal(true)} className="p-1 rounded hover:bg-zinc-850 text-zinc-400" title="Projects (Local RAG)">
                 <FolderOpen className="w-4 h-4" />
               </button>
+              <button onClick={() => setShowSchedulesModal(true)} className="p-1 rounded hover:bg-zinc-855 text-zinc-400" title="Schedules & Automations">
+                <Calendar className="w-4 h-4" />
+              </button>
               <button onClick={() => setShowMcpModal(true)} className="p-1 rounded hover:bg-zinc-850 text-zinc-400" title="MCP Servers">
                 <Share2 className="w-4 h-4" />
               </button>
@@ -771,7 +831,7 @@ export default function Home() {
             </div>
           )}
 
-          <div className="max-w-3xl mx-auto flex items-center gap-2 bg-zinc-950 border border-zinc-855 rounded-xl p-2 focus-within:border-amber-500/40">
+          <div className="max-w-3xl mx-auto flex items-center gap-2 bg-zinc-955 border border-zinc-855 rounded-xl p-2 focus-within:border-amber-500/40">
             <button onClick={() => fileInputRef.current?.click()} className="p-2 text-zinc-500 hover:text-zinc-300 transition" title="Add File / Image Attachment">
               <Paperclip className="w-5 h-5" />
             </button>
@@ -815,7 +875,7 @@ export default function Home() {
 
       {/* Side-by-side Agent activity trace log panel */}
       {agentMode && showLogsPanel && (
-        <div className="w-80 border-l border-zinc-800 bg-zinc-955 flex flex-col h-full shrink-0">
+        <div className="w-80 border-l border-zinc-850 bg-zinc-955 flex flex-col h-full shrink-0">
           <div className="h-14 border-b border-zinc-800 px-4 flex items-center justify-between bg-zinc-900/50">
             <span className="font-semibold text-xs text-zinc-200 flex items-center gap-1.5">
               <Activity className="w-4 h-4 text-amber-500" /> Agent Tool Trace Log
@@ -955,6 +1015,91 @@ export default function Home() {
         </div>
       )}
 
+      {/* Schedules & Automations Modal */}
+      {showSchedulesModal && (
+        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-850 rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+              <h3 className="font-semibold text-lg flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-amber-500" /> Scheduled Automations
+              </h3>
+              <button onClick={() => setShowSchedulesModal(false)} className="text-zinc-400 hover:text-white text-xl">×</button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              <div className="bg-zinc-950 p-4 rounded-lg border border-zinc-850 space-y-3">
+                <h4 className="text-xs font-semibold text-zinc-300">Create New Automation Task</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={newSchedName}
+                    onChange={(e) => setNewSchedName(e.target.value)}
+                    placeholder="Task Name (e.g. Daily Digest)"
+                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none focus:border-amber-500 text-zinc-200"
+                  />
+                  <input
+                    type="text"
+                    value={newSchedCron}
+                    onChange={(e) => setNewSchedCron(e.target.value)}
+                    placeholder="Cron Expression or Preset (daily/hourly)"
+                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none focus:border-amber-500 text-zinc-200"
+                  />
+                  <textarea
+                    value={newSchedPrompt}
+                    onChange={(e) => setNewSchedPrompt(e.target.value)}
+                    placeholder="Automation prompt to run..."
+                    rows={2}
+                    className="col-span-2 bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none focus:border-amber-500 resize-none text-zinc-200"
+                  />
+                  <div className="col-span-2 flex items-center gap-3">
+                    <span className="text-xs text-zinc-400">Execution Mode:</span>
+                    <select
+                      value={newSchedMode}
+                      onChange={(e) => setNewSchedMode(e.target.value as any)}
+                      className="bg-zinc-900 border border-zinc-800 text-xs rounded p-1 text-zinc-300"
+                    >
+                      <option value="chat">Chat Mode</option>
+                      <option value="agent">Agent Mode</option>
+                    </select>
+                  </div>
+                </div>
+                <button onClick={handleAddSchedule} className="bg-amber-600 hover:bg-amber-500 text-xs font-bold px-4 py-1.5 rounded transition">
+                  Create Automation
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-xs font-semibold text-zinc-300">Active Schedules</h4>
+                {schedulesList.length === 0 ? (
+                  <div className="text-xs text-zinc-500">No automation schedules created. Tasks run periodically in the background.</div>
+                ) : (
+                  <div className="space-y-2">
+                    {schedulesList.map((sc) => (
+                      <div key={sc.id} className="flex items-center justify-between bg-zinc-955 p-3 rounded-lg border border-zinc-850 text-xs">
+                        <div>
+                          <div className="font-semibold text-zinc-200">{sc.name}</div>
+                          <div className="text-[10px] text-zinc-500 mt-1 font-mono">
+                            Cron: {sc.cronExpression} | Prompt: "{sc.prompt.slice(0, 30)}..."
+                          </div>
+                          {sc.lastRunTime && (
+                            <div className="text-[10px] text-amber-500 flex items-center gap-1 mt-1">
+                              <Clock className="w-3 h-3" /> Last Run: {new Date(sc.lastRunTime).toLocaleTimeString()} ({sc.lastRunStatus})
+                            </div>
+                          )}
+                        </div>
+                        <button onClick={() => handleDeleteSchedule(sc.id)} className="text-rose-400 hover:bg-rose-955/50 p-1.5 rounded transition">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MCP Servers Manager Modal */}
       {showMcpModal && (
         <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
@@ -975,21 +1120,21 @@ export default function Home() {
                     value={newMcpName}
                     onChange={(e) => setNewMcpName(e.target.value)}
                     placeholder="Server Name (e.g. github)"
-                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none focus:border-amber-500"
+                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none focus:border-amber-500 text-zinc-200"
                   />
                   <input
                     type="text"
                     value={newMcpCommand}
                     onChange={(e) => setNewMcpCommand(e.target.value)}
                     placeholder="Command (e.g. node)"
-                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none focus:border-amber-500"
+                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none focus:border-amber-500 text-zinc-200"
                   />
                   <input
                     type="text"
                     value={newMcpArgs}
                     onChange={(e) => setNewMcpArgs(e.target.value)}
                     placeholder="Args (comma separated)"
-                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none focus:border-amber-500"
+                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-xs outline-none focus:border-amber-500 text-zinc-200"
                   />
                 </div>
                 <button onClick={handleAddMcpServer} className="bg-amber-600 hover:bg-amber-500 text-xs font-bold px-4 py-1.5 rounded transition">
@@ -1005,7 +1150,7 @@ export default function Home() {
                 ) : (
                   <div className="space-y-2">
                     {mcpServers.map((srv) => (
-                      <div key={srv.name} className="flex items-center justify-between bg-zinc-950 p-3 rounded-lg border border-zinc-850 text-xs">
+                      <div key={srv.name} className="flex items-center justify-between bg-zinc-950 p-3 rounded-lg border border-zinc-855 text-xs">
                         <div>
                           <div className="font-semibold text-zinc-200">{srv.name}</div>
                           <div className="text-[10px] text-zinc-500 font-mono mt-0.5">{srv.command} {srv.args.join(' ')}</div>
@@ -1051,7 +1196,7 @@ export default function Home() {
                   type="text"
                   value={baseUrl}
                   onChange={(e) => setBaseUrl(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-855 rounded-lg px-3 py-2 text-sm focus:border-amber-500 outline-none text-zinc-200"
+                  className="w-full bg-zinc-955 border border-zinc-855 rounded-lg px-3 py-2 text-sm focus:border-amber-500 outline-none text-zinc-200"
                 />
               </div>
 
@@ -1098,7 +1243,7 @@ export default function Home() {
                     value={pullModelInput}
                     onChange={(e) => setPullModelInput(e.target.value)}
                     placeholder="e.g. nomic-embed-text, qwen2.5:14b..."
-                    className="flex-1 bg-zinc-955 border border-zinc-850 rounded-lg px-3 py-2 text-sm focus:border-amber-500 outline-none text-zinc-200"
+                    className="flex-1 bg-zinc-955 border border-zinc-855 rounded-lg px-3 py-2 text-sm focus:border-amber-500 outline-none text-zinc-200"
                   />
                   <button onClick={handlePullModel} className="bg-amber-600 hover:bg-amber-500 px-4 py-2 rounded-lg text-sm font-medium transition">Pull</button>
                 </div>

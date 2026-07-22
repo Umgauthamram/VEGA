@@ -8,6 +8,7 @@
   "permissions": [
     "core:default",
     "sql:default",
-    "shell:default"
+    "shell:default",
+    "notification:default"
   ]
 }
