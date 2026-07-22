@@ -371,6 +371,27 @@ export default function Home() {
     URL.revokeObjectURL(url);
   }
 
+  // Backup importer utility
+  async function handleBackupImport(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        if (data.conversations) setConversations(data.conversations);
+        if (data.presets) setPresets(data.presets);
+        if (data.projects) setProjects(data.projects);
+        if (data.mcpServers) setMcpServers(data.mcpServers);
+        if (data.userMemory) setUserMemoryText(data.userMemory);
+        alert('Backup imported successfully!');
+      } catch (err) {
+        alert('Invalid backup file format.');
+      }
+    };
+    reader.readAsText(file);
+  }
+
   async function handlePullModel() {
     if (!pullModelInput.trim()) return;
     const name = pullModelInput.trim();
@@ -1283,15 +1304,21 @@ export default function Home() {
                 />
               </div>
 
-              {/* Backup Exporter */}
+              {/* Backup Exporter & Importer */}
               <div className="bg-zinc-950 p-4 rounded-lg border border-zinc-850 space-y-2">
                 <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
                   <Database className="w-4 h-4 text-amber-500" /> Local Database & Config Backup
                 </label>
-                <p className="text-xs text-zinc-500">Download conversation threads, MCP configurations, custom memory files, and parameter profiles as a JSON bundle.</p>
-                <button onClick={handleBackupExport} className="bg-zinc-800 hover:bg-zinc-700 text-xs px-4 py-2 rounded-lg font-semibold transition text-zinc-300">
-                  Export Backup File
-                </button>
+                <p className="text-xs text-zinc-500">Download or recover conversation threads, MCP configurations, custom memory files, and parameter profiles as a JSON bundle.</p>
+                <div className="flex gap-3">
+                  <button onClick={handleBackupExport} className="bg-zinc-800 hover:bg-zinc-700 text-xs px-4 py-2 rounded-lg font-semibold transition text-zinc-300">
+                    Export Backup File
+                  </button>
+                  <label className="bg-zinc-800 hover:bg-zinc-700 text-xs px-4 py-2 rounded-lg font-semibold transition text-zinc-300 cursor-pointer">
+                    Import Backup File
+                    <input type="file" onChange={handleBackupImport} accept=".json" className="hidden" />
+                  </label>
+                </div>
               </div>
 
               {/* Agent Settings (Workspace Dir & Safety Level) */}

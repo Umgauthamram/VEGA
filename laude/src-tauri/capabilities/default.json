@@ -9,6 +9,7 @@
     "core:default",
     "sql:default",
     "shell:default",
-    "notification:default"
+    "notification:default",
+    "global-shortcut:default"
   ]
 }
