@@ -26,21 +26,7 @@
     "notification:default",
     "global-shortcut:default",
     "fs:default",
-    {
-      "identifier": "fs:allow-read-recursive",
-      "allow": [
-        {
-          "path": "**"
-        }
-      ]
-    },
-    {
-      "identifier": "fs:allow-write-recursive",
-      "allow": [
-        {
-          "path": "**"
-        }
-      ]
-    }
+    "fs:read-all",
+    "fs:write-all"
   ]
 }
