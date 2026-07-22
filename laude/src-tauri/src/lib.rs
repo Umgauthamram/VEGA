@@ -1,3 +1,5 @@
+use tauri::Manager;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -10,9 +12,9 @@ pub fn run() {
         )?;
       }
       app.handle().plugin(tauri_plugin_sql::Builder::default().build())?;
-      app.handle().plugin(tauri_plugin_shell::Builder::default().build())?;
-      app.handle().plugin(tauri_plugin_notification::Builder::default().build())?;
-      app.handle().plugin(tauri_plugin_global_shortcut::Builder::default().build())?;
+      app.handle().plugin(tauri_plugin_shell::init())?;
+      app.handle().plugin(tauri_plugin_notification::init())?;
+      app.handle().plugin(tauri_plugin_global_shortcut::Builder::new().build())?;
 
       // Register system tray menu items
       let tray_menu = tauri::menu::Menu::with_id(app.handle(), "tray")?;
