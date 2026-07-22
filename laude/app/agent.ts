@@ -93,7 +93,7 @@ export async function executeToolLocally(
           return `Error reading file at ${targetPath}: ${e.message || e}`;
         }
       }
-      return `[read_file Mock] Successfully read content of ${targetPath}. (Running in Web environment)`;
+      return `Error: file/shell tools require the desktop app. Run 'npm run tauri dev'.`;
     }
     case 'write_file': {
       const targetPath = args.path.startsWith('/') || args.path.includes(':') 
@@ -108,7 +108,7 @@ export async function executeToolLocally(
           return `Error writing file at ${targetPath}: ${e.message || e}`;
         }
       }
-      return `[write_file Mock] Successfully wrote content to ${targetPath}.`;
+      return `Error: file/shell tools require the desktop app. Run 'npm run tauri dev'.`;
     }
     case 'list_dir': {
       const targetPath = args.path.startsWith('/') || args.path.includes(':') 
@@ -127,7 +127,7 @@ export async function executeToolLocally(
           return `Error listing directory at ${targetPath}: ${e.message || e}`;
         }
       }
-      return `[list_dir Mock] Folder contents of ${targetPath}: \n- package.json\n- app/\n- src-tauri/`;
+      return `Error: file/shell tools require the desktop app. Run 'npm run tauri dev'.`;
     }
     case 'run_shell': {
       if (isTauri) {
@@ -144,7 +144,7 @@ export async function executeToolLocally(
           return `Shell execution error: ${e.message || e}`;
         }
       }
-      return `[run_shell Mock] Command "${args.command}" execution mocked successfully.`;
+      return `Error: file/shell tools require the desktop app. Run 'npm run tauri dev'.`;
     }
     case 'web_fetch': {
       try {

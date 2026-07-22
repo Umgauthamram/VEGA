@@ -51,16 +51,23 @@ export class LLMClient {
     }
   }
 
+  private modelCapsCache = new Map<string, any>();
+
   async showModelInfo(modelName: string): Promise<any> {
     if (this.activeProvider.type !== 'ollama') return null;
+    if (this.modelCapsCache.has(modelName)) {
+      return this.modelCapsCache.get(modelName);
+    }
     try {
       const res = await fetch(`${this.activeProvider.baseUrl}/api/show`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: modelName })
+        body: JSON.stringify({ model: modelName })
       });
       if (res.ok) {
-        return await res.json();
+        const info = await res.json();
+        this.modelCapsCache.set(modelName, info);
+        return info;
       }
     } catch (e) {
       console.warn('Failed to query model details:', e);
@@ -75,16 +82,29 @@ export class LLMClient {
         if (res.ok) {
           const data = await res.json();
           const list: OllamaModel[] = data.models || [];
-          // Query details for each model to inspect capabilities
+          
+          // Query details for all models in parallel using Promise.all
+          const detailsList = await Promise.all(
+            list.map(m => this.showModelInfo(m.name))
+          );
+
           const filtered: OllamaModel[] = [];
-          for (const m of list) {
-            const info = await this.showModelInfo(m.name);
-            const caps: string[] = info?.details?.families || info?.families || [];
-            // Parse capabilities (Ollama details contains format/families)
-            // By default, if it's not strictly known, we check if it is not an embed model
-            const isEmbed = m.name.toLowerCase().includes('embed') || (info?.projector_info);
-            const isCompletion = !isEmbed; 
-            if (isCompletion) {
+          for (let i = 0; i < list.length; i++) {
+            const m = list[i];
+            const info = detailsList[i];
+            
+            // Ollama show endpoint capabilities contains completion/embedding details
+            const caps: string[] = info?.capabilities || [];
+            
+            // Fallback for older Ollama versions if capabilities array is not present
+            const isEmbedOnly = m.name.toLowerCase().includes('embed') || 
+              (info?.projector_info) || 
+              (info?.details?.family === 'bert') ||
+              (caps.includes('embedding') && !caps.includes('completion'));
+
+            const hasCompletion = caps.length > 0 ? caps.includes('completion') : !isEmbedOnly;
+
+            if (hasCompletion) {
               filtered.push(m);
             }
           }

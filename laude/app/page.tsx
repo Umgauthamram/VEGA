@@ -165,6 +165,7 @@ export default function Home() {
   const [newProvApiKey, setNewProvApiKey] = useState<string>('');
   const [newProvType, setNewProvType] = useState<'ollama' | 'openai-compatible'>('ollama');
   const [showApiKey, setShowApiKey] = useState<boolean>(false);
+  const [showBrowserWarning, setShowBrowserWarning] = useState<boolean>(false);
 
   // Background automation tick simulator checking schedules
   useEffect(() => {
@@ -640,6 +641,36 @@ export default function Home() {
         const maxIterations = 15;
         let finalResponseText = '';
 
+        // Query model details to inspect capabilities
+        const modelInfo = await ollamaClient.showModelInfo(selectedModel || activeConv.model);
+        const caps: string[] = modelInfo?.capabilities || [];
+        const supportsTools = caps.includes('tools');
+
+        if (!supportsTools) {
+          setAgentLogs((prev) => [
+            ...prev,
+            { step: `Selected model does not support native tools. Falling back to ReAct JSON instructions scaffold.`, type: 'call', timestamp: Date.now() }
+          ]);
+          // Inject instructions to guide the model to output tools in JSON format
+          const reactScaffoldPrompt = `
+You are running in ReAct fallback mode. You have access to the following tools:
+${JSON.stringify(BUILTIN_TOOLS, null, 2)}
+
+To call a tool, you MUST reply with a JSON object inside a markdown code block starting with \`\`\`json containing 'tool' and 'arguments' keys.
+Example:
+\`\`\`json
+{
+  "tool": "read_file",
+  "arguments": {
+    "path": "package.json"
+  }
+}
+\`\`\`
+If you have completed your task, reply normally without any JSON block.
+`;
+          currentMessages.push({ role: 'system', content: reactScaffoldPrompt });
+        }
+
         // Dynamically join Builtin Tools + loaded MCP tools
         const dynamicTools = [
           ...BUILTIN_TOOLS,
@@ -654,7 +685,7 @@ export default function Home() {
           iteration++;
           setAgentLogs((prev) => [...prev, { step: `Starting agent loop iteration ${iteration}`, type: 'call', timestamp: Date.now() }]);
 
-          // Send tools schema to Ollama API
+          // Send tools schema to Ollama API only if native tools are supported
           const response = await ollamaClient.streamChat(
             selectedModel || activeConv.model,
             currentMessages,
@@ -662,7 +693,7 @@ export default function Home() {
             keepAlive,
             undefined,
             abortController.signal,
-            dynamicTools
+            supportsTools ? dynamicTools : undefined
           );
 
           if (response.content) {
@@ -672,9 +703,36 @@ export default function Home() {
             );
           }
 
-          if (response.tool_calls && response.tool_calls.length > 0) {
-            const toolCall = response.tool_calls[0]; // execute first tool call in sequence
-            const { name, arguments: args } = toolCall.function || toolCall;
+          // Resolve tool call either natively or via ReAct JSON extraction
+          let toolCallToRun: any = null;
+          if (supportsTools && response.tool_calls && response.tool_calls.length > 0) {
+            toolCallToRun = response.tool_calls[0];
+          } else if (!supportsTools && response.content) {
+            // ReAct JSON block parsing
+            const match = response.content.match(/```json\s*([\s\S]*?)\s*```/);
+            if (match) {
+              try {
+                const parsed = JSON.parse(match[1]);
+                if (parsed.tool && parsed.arguments) {
+                  toolCallToRun = {
+                    id: 'tc_' + Date.now(),
+                    function: {
+                      name: parsed.tool,
+                      arguments: parsed.arguments
+                    }
+                  };
+                }
+              } catch (err: any) {
+                setAgentLogs((prev) => [
+                  ...prev,
+                  { step: `Failed to parse ReAct JSON tool output: ${err.message}`, type: 'error', timestamp: Date.now() }
+                ]);
+              }
+            }
+          }
+
+          if (toolCallToRun) {
+            const { name, arguments: args } = toolCallToRun.function || toolCallToRun;
 
             setAgentLogs((prev) => [
               ...prev,
@@ -690,7 +748,7 @@ export default function Home() {
             if (needsApproval) {
               toolOutput = await new Promise<string>((resolve) => {
                 setPendingApproval({
-                  toolCallId: toolCall.id || 'tc_' + Date.now(),
+                  toolCallId: toolCallToRun.id || 'tc_' + Date.now(),
                   name,
                   args,
                   onApprove: async () => {
@@ -714,8 +772,13 @@ export default function Home() {
             ]);
 
             // Append assistant tool request & response back to conversation history
-            currentMessages.push({ role: 'assistant', content: response.content || '', tool_calls: response.tool_calls } as any);
-            currentMessages.push({ role: 'tool', content: toolOutput, name } as any);
+            if (supportsTools) {
+              currentMessages.push({ role: 'assistant', content: response.content || '', tool_calls: response.tool_calls } as any);
+              currentMessages.push({ role: 'tool', content: toolOutput, name } as any);
+            } else {
+              currentMessages.push({ role: 'assistant', content: response.content || '' });
+              currentMessages.push({ role: 'user', content: `Tool execution response:\n${toolOutput}` });
+            }
           } else {
             // No tool calls returned. We've reached final text answer.
             setAgentLogs((prev) => [...prev, { step: `Agent finished execution loop successfully.`, type: 'response', timestamp: Date.now() }]);
@@ -888,7 +951,21 @@ export default function Home() {
           {/* Toggle Agent mode vs normal chat */}
           <div className="flex items-center gap-3 bg-sidebar border border-border-color rounded-lg px-3 py-1 text-xs">
             <span className="font-semibold text-foreground/70 uppercase tracking-wider">Agent Mode</span>
-            <button onClick={() => setAgentMode(!agentMode)} className="text-accent hover:text-accent-hover transition">
+            <button 
+              onClick={() => {
+                const nextVal = !agentMode;
+                setAgentMode(nextVal);
+                if (nextVal) {
+                  const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ !== undefined;
+                  if (!isTauri) {
+                    setShowBrowserWarning(true);
+                  }
+                } else {
+                  setShowBrowserWarning(false);
+                }
+              }} 
+              className="text-accent hover:text-accent-hover transition"
+            >
               {agentMode ? <ToggleRight className="w-7 h-7" /> : <ToggleLeft className="w-7 h-7 text-foreground/40" />}
             </button>
             {agentMode && (
@@ -902,6 +979,14 @@ export default function Home() {
         {/* Message Thread */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           <div className="max-w-[48rem] mx-auto space-y-8">
+            {showBrowserWarning && (
+              <div className="bg-amber-600/10 border border-amber-600/30 rounded-xl p-4 text-xs text-amber-500 flex justify-between items-center gap-3">
+                <span>
+                  <strong>Warning:</strong> File/shell tools require the desktop app. Run <code>npm run tauri dev</code> to enable desktop execution context.
+                </span>
+                <button onClick={() => setShowBrowserWarning(false)} className="font-bold text-sm text-amber-500/70 hover:text-amber-500">×</button>
+              </div>
+            )}
             {messages.length === 0 ? (
               models.length === 0 ? (
                 <div className="h-[60vh] flex flex-col items-center justify-center text-center text-foreground/60 gap-4 max-w-md mx-auto">
