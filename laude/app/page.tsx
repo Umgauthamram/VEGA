@@ -877,38 +877,22 @@ export default function Home() {
       </aside>
 
       {/* Main chat interface */}
-      <main className="flex-1 flex flex-col justify-between bg-zinc-900 relative min-w-0">
-        <header className="h-14 border-b border-zinc-855 px-6 flex items-center justify-between bg-zinc-900/50 backdrop-blur shrink-0">
+      <main className="flex-1 flex flex-col justify-between bg-background relative min-w-0">
+        <header className="h-14 border-b border-border-color px-6 flex items-center justify-between bg-background/50 backdrop-blur shrink-0">
           <div className="flex items-center gap-3">
-            <Cpu className="w-4 h-4 text-zinc-400" />
-            <select
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              className="bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm rounded-md px-3 py-1.5 outline-none"
-            >
-              {models.length === 0 ? (
-                <option value="">No local models found</option>
-              ) : (
-                models.map((m) => (
-                  <option key={m.name} value={m.name}>
-                    {m.name} ({m.details?.parameter_size || 'N/A'})
-                  </option>
-                ))
-              )}
-            </select>
-            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-zinc-850 border border-zinc-800 text-zinc-400">
+            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-sidebar border border-border-color text-foreground opacity-80">
               {activeProviderName}
             </span>
           </div>
 
           {/* Toggle Agent mode vs normal chat */}
-          <div className="flex items-center gap-3 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1 text-xs">
-            <span className="font-semibold text-zinc-400 uppercase tracking-wider">Agent Mode</span>
-            <button onClick={() => setAgentMode(!agentMode)} className="text-amber-500 hover:text-amber-400 transition">
-              {agentMode ? <ToggleRight className="w-7 h-7" /> : <ToggleLeft className="w-7 h-7 text-zinc-600" />}
+          <div className="flex items-center gap-3 bg-sidebar border border-border-color rounded-lg px-3 py-1 text-xs">
+            <span className="font-semibold text-foreground/70 uppercase tracking-wider">Agent Mode</span>
+            <button onClick={() => setAgentMode(!agentMode)} className="text-accent hover:text-accent-hover transition">
+              {agentMode ? <ToggleRight className="w-7 h-7" /> : <ToggleLeft className="w-7 h-7 text-foreground/40" />}
             </button>
             {agentMode && (
-              <button onClick={() => setShowLogsPanel(!showLogsPanel)} className="p-1 hover:bg-zinc-800 rounded text-zinc-400" title="Toggle trace logs">
+              <button onClick={() => setShowLogsPanel(!showLogsPanel)} className="p-1 hover:bg-background/80 rounded text-foreground/60" title="Toggle trace logs">
                 <Activity className="w-3.5 h-3.5" />
               </button>
             )}
@@ -917,112 +901,111 @@ export default function Home() {
 
         {/* Message Thread */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {messages.length === 0 ? (
-            models.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center text-zinc-500 gap-4 max-w-md mx-auto">
-                <Bot className="w-12 h-12 text-zinc-700 animate-pulse" />
-                <h2 className="text-lg font-medium text-zinc-300">No chat model installed</h2>
-                <p className="text-xs text-zinc-500">Pull a recommended model locally to start chat conversations offline.</p>
-                <div className="flex flex-col gap-2 w-full mt-2">
-                  <button 
-                    onClick={() => { setPullModelInput('llama3.2:3b'); handlePullModel(); }}
-                    className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-xs py-2 px-3 rounded-lg transition font-medium"
-                  >
-                    Pull Llama 3.2 (3B - Fast)
-                  </button>
-                  <button 
-                    onClick={() => { setPullModelInput('qwen2.5:7b'); handlePullModel(); }}
-                    className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-xs py-2 px-3 rounded-lg transition font-medium"
-                  >
-                    Pull Qwen 2.5 (7B - Precise)
-                  </button>
-                  <button 
-                    onClick={() => { setPullModelInput('mistral:7b'); handlePullModel(); }}
-                    className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-xs py-2 px-3 rounded-lg transition font-medium"
-                  >
-                    Pull Mistral (7B - Creative)
-                  </button>
-                </div>
-                {pullProgress && (
-                  <div className="text-xs text-amber-500 mt-2 font-mono">
-                    {pullProgress.status} {pullProgress.percent !== undefined ? `(${pullProgress.percent}%)` : ''}
+          <div className="max-w-[48rem] mx-auto space-y-8">
+            {messages.length === 0 ? (
+              models.length === 0 ? (
+                <div className="h-[60vh] flex flex-col items-center justify-center text-center text-foreground/60 gap-4 max-w-md mx-auto">
+                  <Bot className="w-12 h-12 text-accent/60 animate-pulse" />
+                  <h2 className="text-xl font-serif text-foreground font-semibold">No chat model installed</h2>
+                  <p className="text-xs text-foreground/50">Pull a recommended model locally to start chat conversations offline.</p>
+                  <div className="flex flex-col gap-2 w-full mt-2">
+                    <button 
+                      onClick={() => { setPullModelInput('llama3.2:3b'); handlePullModel(); }}
+                      className="bg-accent hover:bg-accent-hover text-white text-xs py-2 px-3 rounded-lg transition font-medium"
+                    >
+                      Pull Llama 3.2 (3B - Fast)
+                    </button>
+                    <button 
+                      onClick={() => { setPullModelInput('qwen2.5:7b'); handlePullModel(); }}
+                      className="bg-accent hover:bg-accent-hover text-white text-xs py-2 px-3 rounded-lg transition font-medium"
+                    >
+                      Pull Qwen 2.5 (7B - Precise)
+                    </button>
+                    <button 
+                      onClick={() => { setPullModelInput('mistral:7b'); handlePullModel(); }}
+                      className="bg-accent hover:bg-accent-hover text-white text-xs py-2 px-3 rounded-lg transition font-medium"
+                    >
+                      Pull Mistral (7B - Creative)
+                    </button>
                   </div>
-                )}
-              </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center text-zinc-500 gap-3">
-                <Bot className="w-12 h-12 text-zinc-700" />
-                <h2 className="text-lg font-medium text-zinc-300">How can Laude help you today?</h2>
-                {agentMode && (
-                  <div className="text-xs bg-amber-500/10 border border-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg max-w-sm">
-                    Agent Mode activated. System tools (filesystem access, web fetches, and commands execution) will run locally on your system.
-                  </div>
-                )}
-              </div>
-            )
-          ) : (
-            messages.map((msg) => (
-              <div key={msg.id} className={`flex gap-4 max-w-3xl mx-auto ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                {msg.role === 'assistant' && (
-                  <div className="w-8 h-8 rounded-full bg-amber-600/20 border border-amber-500/30 flex items-center justify-center shrink-0">
-                    <Bot className="w-4 h-4 text-amber-400" />
-                  </div>
-                )}
-                <div className={`p-4 rounded-xl text-sm leading-relaxed max-w-2xl whitespace-pre-wrap ${
-                  msg.role === 'user' ? 'bg-zinc-800 text-zinc-100 rounded-tr-none' : 
-                  msg.content.includes('*(Error:') ? 'bg-rose-950/40 text-rose-200 rounded-tl-none border border-rose-900/50' :
-                  'bg-zinc-950/80 text-zinc-200 rounded-tl-none border border-zinc-850'
-                }`}>
-                  {msg.role === 'assistant' ? (
-                    msg.content === '' ? (
-                      <div className="flex items-center gap-1.5 py-1 text-zinc-500 font-mono text-xs">
-                        <span className="animate-bounce font-bold">●</span>
-                        <span className="animate-bounce delay-75 font-bold">●</span>
-                        <span className="animate-bounce delay-150 font-bold">●</span>
-                        <span className="ml-1 text-[10px] uppercase font-semibold tracking-wider">thinking...</span>
-                      </div>
-                    ) : (
-                      <MarkdownRenderer 
-                        content={msg.content} 
-                        onCodeBlockClick={(lang, code) => setSelectedArtifact({ language: lang, code })} 
-                      />
-                    )
-                  ) : (
-                    <span>{msg.content}</span>
+                  {pullProgress && (
+                    <div className="text-xs text-accent mt-2 font-mono">
+                      {pullProgress.status} {pullProgress.percent !== undefined ? `(${pullProgress.percent}%)` : ''}
+                    </div>
                   )}
                 </div>
-                {msg.role === 'user' && (
-                  <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center shrink-0">
-                    <User className="w-4 h-4 text-zinc-400" />
+              ) : (
+                <div className="h-[60vh] flex flex-col items-center justify-center text-center text-foreground/60 gap-3">
+                  <Bot className="w-12 h-12 text-accent/80" />
+                  <h2 className="text-3xl font-serif text-foreground font-semibold">
+                    {(() => {
+                      const hr = new Date().getHours();
+                      if (hr < 12) return "Good morning";
+                      if (hr < 18) return "Good afternoon";
+                      return "Good evening";
+                    })()}
+                  </h2>
+                  <p className="text-sm text-foreground/60">How can Laude help you today?</p>
+                  {agentMode && (
+                    <div className="text-xs bg-accent/10 border border-accent/20 text-accent px-3 py-1.5 rounded-lg max-w-sm">
+                      Agent Mode activated. System tools (filesystem access, web fetches, and commands execution) will run locally on your system.
+                    </div>
+                  )}
+                </div>
+              )
+            ) : (
+              messages.map((msg) => (
+                <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                  {msg.role === 'assistant' && (
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-foreground/40 mb-1">
+                      {msg.model_used || selectedModel || 'Assistant'}
+                    </span>
+                  )}
+                  <div className={`text-sm leading-relaxed max-w-full whitespace-pre-wrap ${
+                    msg.role === 'user' ? 'bg-[#EEEDE4] text-[#3D3929] px-4 py-3 rounded-2xl border border-border-color' : 
+                    msg.content.includes('*(Error:') ? 'bg-rose-950/20 text-rose-300 px-4 py-3 rounded-2xl border border-rose-900/30' :
+                    'text-foreground'
+                  }`}>
+                    {msg.role === 'assistant' ? (
+                      msg.content === '' ? (
+                        <div className="flex items-center gap-1.5 py-1 text-accent font-mono text-xs">
+                          <span className="animate-bounce font-bold">●</span>
+                          <span className="animate-bounce delay-75 font-bold">●</span>
+                          <span className="animate-bounce delay-150 font-bold">●</span>
+                        </div>
+                      ) : (
+                        <MarkdownRenderer 
+                          content={msg.content} 
+                          onCodeBlockClick={(lang, code) => setSelectedArtifact({ language: lang, code })} 
+                        />
+                      )
+                    ) : (
+                      <span>{msg.content}</span>
+                    )}
                   </div>
-                )}
-              </div>
-            ))
-          )}
+                </div>
+              ))
+            )}
+          </div>
           <div ref={chatEndRef} />
         </div>
 
         {/* Input box */}
-        <div className="p-4 border-t border-zinc-800 bg-zinc-900/80 backdrop-blur shrink-0">
+        <div className="p-4 bg-background shrink-0">
           {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 max-w-3xl mx-auto mb-3">
+            <div className="flex flex-wrap gap-2 max-w-[48rem] mx-auto mb-3">
               {attachments.map((a, idx) => (
-                <div key={idx} className="flex items-center gap-1.5 bg-zinc-800/80 border border-zinc-700 px-3 py-1 rounded-full text-xs text-zinc-300">
+                <div key={idx} className="flex items-center gap-1.5 bg-sidebar border border-border-color px-3 py-1 rounded-full text-xs text-foreground/80">
                   <span className="truncate max-w-[150px]">{a.name}</span>
-                  <button onClick={() => removeAttachment(idx)} className="text-zinc-400 hover:text-white font-bold">×</button>
+                  <button onClick={() => removeAttachment(idx)} className="text-foreground/60 hover:text-foreground font-bold">×</button>
                 </div>
               ))}
             </div>
           )}
 
-          <div className="max-w-3xl mx-auto flex items-center gap-2 bg-zinc-950 border border-zinc-855 rounded-xl p-2 focus-within:border-amber-500/40">
-            <button onClick={() => fileInputRef.current?.click()} className="p-2 text-zinc-500 hover:text-zinc-300 transition" title="Add File / Image Attachment">
-              <Paperclip className="w-5 h-5" />
-            </button>
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} multiple className="hidden" />
-
+          <div className="max-w-[48rem] mx-auto flex flex-col bg-card-bg border border-border-color rounded-2xl p-3 shadow-sm focus-within:border-accent/40 relative">
             <textarea
-              rows={1}
+              rows={2}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
@@ -1032,25 +1015,51 @@ export default function Home() {
                 }
               }}
               placeholder={agentMode ? "Provide a task for the Agent... (e.g. read package.json file)" : "Send message or upload code files..."}
-              className="flex-1 bg-transparent border-none text-zinc-100 text-sm px-2 focus:outline-none resize-none max-h-32 min-h-[40px] py-2"
+              className="w-full bg-transparent border-none text-foreground text-sm px-2 focus:outline-none resize-none min-h-[50px] py-1"
             />
 
-            {isStreaming ? (
-              <button onClick={handleStopStream} className="p-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition">
-                <div className="w-4 h-4 bg-white rounded-xs" />
-              </button>
-            ) : (
-              <button onClick={handleSendMessage} disabled={!input.trim() && attachments.length === 0} className="p-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white rounded-lg transition">
-                <Send className="w-4 h-4" />
-              </button>
-            )}
+            <div className="flex justify-between items-center mt-2 pt-2 border-t border-border-color/30">
+              <div className="flex items-center gap-2">
+                <button onClick={() => fileInputRef.current?.click()} className="p-2 text-foreground/50 hover:text-foreground/80 transition" title="Add File / Image Attachment">
+                  <Paperclip className="w-4 h-4" />
+                </button>
+                <input type="file" ref={fileInputRef} onChange={handleFileChange} multiple className="hidden" />
+
+                {/* Model picker inside the composer bottom left */}
+                <select
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  className="bg-transparent border border-border-color text-foreground/80 text-xs rounded-lg px-2.5 py-1 outline-none"
+                >
+                  {models.length === 0 ? (
+                    <option value="">No local models found</option>
+                  ) : (
+                    models.map((m) => (
+                      <option key={m.name} value={m.name}>
+                        {m.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              {isStreaming ? (
+                <button onClick={handleStopStream} className="p-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition">
+                  <div className="w-3.5 h-3.5 bg-white rounded-xs" />
+                </button>
+              ) : (
+                <button onClick={handleSendMessage} disabled={!input.trim() && attachments.length === 0} className="p-2 bg-accent hover:bg-accent-hover disabled:opacity-40 text-white rounded-lg transition">
+                  <Send className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Context Token usage indicator */}
-          <div className="max-w-3xl mx-auto flex items-center justify-between text-[10px] text-zinc-500 mt-2 px-1">
+          <div className="max-w-[48rem] mx-auto flex items-center justify-between text-[10px] text-foreground/40 mt-2 px-1">
             <span>Estimated context tokens: {contextUsage.tokens} / {activePreset.num_ctx}</span>
-            <div className="w-32 bg-zinc-800 h-1 rounded overflow-hidden">
-              <div className="bg-amber-500 h-full" style={{ width: `${contextUsage.pct}%` }} />
+            <div className="w-32 bg-border-color/40 h-1 rounded overflow-hidden">
+              <div className="bg-accent h-full" style={{ width: `${contextUsage.pct}%` }} />
             </div>
           </div>
         </div>
