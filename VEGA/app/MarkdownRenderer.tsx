@@ -21,7 +21,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, onC
   };
 
   return (
-    <div className="prose prose-invert max-w-none text-sm space-y-3 leading-relaxed">
+    <div className="prose max-w-none text-sm text-foreground/90">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}
@@ -33,7 +33,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, onC
 
             if (inline) {
               return (
-                <code className="bg-zinc-800 text-amber-400 px-1 py-0.5 rounded font-mono text-xs" {...props}>
+                <code className="bg-accent/10 text-accent px-1.5 py-0.5 rounded font-mono text-[11px] font-semibold" {...props}>
                   {children}
                 </code>
               );

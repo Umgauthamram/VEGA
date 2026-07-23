@@ -35,7 +35,7 @@ export function RightPanel({
       {/* Header title */}
       <div className="h-14 border-b border-border-color px-4 flex items-center justify-between bg-sidebar/50">
         <span className="font-semibold text-xs text-foreground flex items-center gap-1.5 uppercase tracking-wider font-mono">
-          <Activity className="w-4 h-4 text-accent" /> Execution Progress
+          Execution Progress
         </span>
         <button onClick={() => setShowLogsPanel(false)} className="text-foreground/40 hover:text-foreground text-xl">×</button>
       </div>

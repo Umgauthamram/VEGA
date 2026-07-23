@@ -41,7 +41,7 @@ export function ChatView({
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-between relative min-w-0 bg-background text-foreground">
+    <div className="flex-1 flex flex-col justify-between relative min-w-0 min-h-0 bg-background text-foreground">
       {/* Header Info */}
 
 

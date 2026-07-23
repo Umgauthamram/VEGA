@@ -127,6 +127,18 @@ export default function Home() {
     });
   }, []);
 
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      window.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
+
   // Model parameters / Settings state
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [baseUrl, setBaseUrl] = useState<string>('http://localhost:11434');
