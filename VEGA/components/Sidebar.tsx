@@ -177,12 +177,7 @@ export function Sidebar({
         >
           <Calendar className="w-4 h-4 text-foreground/50" /> Scheduled
         </button>
-        <button
-          onClick={() => setShowSettings(true)}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-foreground/70 hover:bg-background/40 hover:text-foreground transition"
-        >
-          <Settings className="w-4 h-4 text-foreground/50" /> Customize
-        </button>
+
       </div>
 
       {/* C. Pinned & Recents Navigation Groups */}

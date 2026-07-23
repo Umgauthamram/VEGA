@@ -207,8 +207,7 @@ export function SubViews({
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-2xl font-serif font-bold text-foreground">Scheduled Tasks</h2>
-              <p className="text-xs text-foreground/50">Run automated prompt commands at custom periodic intervals locally.</p>
-            </div>
+                 </div>
             <div className="flex items-center gap-3">
               <button 
                 onClick={() => setShowScheduleBuilder(!showScheduleBuilder)}
@@ -311,16 +310,14 @@ export function SubViews({
           {/* Execution Environment Banner */}
           <div className="flex items-center justify-between bg-card-bg border border-border-color p-3.5 rounded-xl text-xs text-foreground/80 shadow-xs">
             <span className="flex items-center gap-2">
-              <span className="text-amber-500 font-bold">⚠</span> Scheduled tasks only run while your computer is awake and online.
+              <span className="text-amber-500 font-bold"></span> Scheduled tasks only run while your computer is awake and online.
             </span>
           </div>
 
           {/* Empty State Canvas / Grid list */}
           {schedulesList.length === 0 ? (
             <div className="bg-card-bg border border-border-color rounded-2xl p-12 text-center flex flex-col items-center justify-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-sidebar border border-border-color/60 flex items-center justify-center text-3xl">
-                ⏰
-              </div>
+         
               <div>
                 <h3 className="font-serif font-bold text-foreground text-lg">No scheduled tasks</h3>
                 <p className="text-xs text-foreground/50 mt-1 max-w-sm mx-auto">Create scheduled automations using templates below or add a custom script execution schedule.</p>
@@ -406,29 +403,9 @@ export function SubViews({
             </div>
           </div>
 
-          {/* Interactive Card Matrix */}
-          {realArtifactsList.length === 0 ? (
-            <div className="bg-card-bg border border-border-color rounded-2xl p-12 text-center text-xs text-foreground/40 italic shadow-xs">
-              No code or markdown artifacts found in conversation history database.
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-6 animate-in fade-in duration-200">
-              {realArtifactsList.map((art) => (
-                <div 
-                  key={art.id}
-                  onClick={() => setSelectedArtifact({ language: art.language, code: art.code })}
-                  className="bg-card-bg border border-border-color hover:border-accent/40 rounded-xl p-4 flex flex-col justify-between h-40 cursor-pointer transition shadow-xs"
-                >
-                  <div>
-                    <span className="text-[9px] font-bold uppercase tracking-wider bg-accent/15 text-accent px-1.5 py-0.5 rounded">{art.language}</span>
-                    <h4 className="font-bold text-foreground text-sm mt-2.5 truncate">{art.title}</h4>
-                    <p className="text-xs text-foreground/50 mt-1 line-clamp-2">{art.code.slice(0, 100)}...</p>
-                  </div>
-                  <span className="text-[10px] text-foreground/45 mt-2">Generated {new Date(art.timestamp).toLocaleDateString()}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="bg-card-bg border border-border-color rounded-2xl p-12 text-center text-xs text-foreground/45 shadow-xs">
+            Still under development.
+          </div>
         </div>
       )}
       
