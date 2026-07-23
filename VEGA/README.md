@@ -4,10 +4,12 @@ npx tauri dev
 
 
 
-Compile and Package a Standalone Desktop App (.msi / .exe)
-# Inside g:\projects\VEGA\VEGA
+# Compile and Package a Standalone Desktop App (.msi / .exe)
+
 npm run build
 
+# for installing as app
+npx tauri build
 
 
 
