@@ -145,7 +145,7 @@ export function Sidebar({
           <span className="flex items-center gap-1.5">
             <Plus className="w-3.5 h-3.5" /> New Chat
           </span>
-          <span className="text-[10px] opacity-75 font-mono">Ctrl+N</span>
+         
         </button>
       </div>
 
