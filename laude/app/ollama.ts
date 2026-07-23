@@ -179,6 +179,16 @@ export class LLMClient {
     }
   }
 
+  async chat(model: string, messages: { role: string; content: string }[]): Promise<string> {
+    try {
+      const res = await this.streamChat(model, messages);
+      return res.content;
+    } catch (e) {
+      console.error('Chat request failed:', e);
+      return `Error generating response: ${e}`;
+    }
+  }
+
   async listRunningModels(): Promise<RunningModel[]> {
     if (this.activeProvider.type !== 'ollama') return [];
     try {

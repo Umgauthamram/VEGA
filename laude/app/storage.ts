@@ -112,6 +112,21 @@ async function initDbSchema(db: Database) {
       type TEXT NOT NULL
     );
   `);
+
+  // Schedules Table
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS schedules (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      cronExpression TEXT NOT NULL,
+      prompt TEXT NOT NULL,
+      model TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      enabled INTEGER DEFAULT 1,
+      lastRunStatus TEXT,
+      lastRunTime INTEGER
+    );
+  `);
 }
 
 // Memory fallbacks
@@ -419,3 +434,53 @@ export async function loadProviders(): Promise<any[]> {
     return Array.from(memoryProviders.values());
   }
 }
+
+// In-memory schedules fallback
+const memorySchedules: Map<string, any> = new Map();
+
+export async function saveScheduleDb(sched: any): Promise<void> {
+  const db = await getDb();
+  if (db) {
+    await db.execute(
+      `INSERT INTO schedules (id, name, cronExpression, prompt, model, mode, enabled, lastRunStatus, lastRunTime)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT(id) DO UPDATE SET
+         name=excluded.name, cronExpression=excluded.cronExpression, prompt=excluded.prompt,
+         model=excluded.model, mode=excluded.mode, enabled=excluded.enabled,
+         lastRunStatus=excluded.lastRunStatus, lastRunTime=excluded.lastRunTime`,
+      [sched.id, sched.name, sched.cronExpression, sched.prompt, sched.model, sched.mode, sched.enabled ? 1 : 0, sched.lastRunStatus || null, sched.lastRunTime || null]
+    );
+  } else {
+    memorySchedules.set(sched.id, sched);
+  }
+}
+
+export async function loadSchedulesDb(): Promise<any[]> {
+  const db = await getDb();
+  if (db) {
+    const rows = await db.select<any[]>(`SELECT * FROM schedules`);
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      cronExpression: r.cronExpression,
+      prompt: r.prompt,
+      model: r.model,
+      mode: r.mode,
+      enabled: r.enabled === 1,
+      lastRunStatus: r.lastRunStatus,
+      lastRunTime: r.lastRunTime
+    }));
+  } else {
+    return Array.from(memorySchedules.values());
+  }
+}
+
+export async function deleteScheduleDb(id: string): Promise<void> {
+  const db = await getDb();
+  if (db) {
+    await db.execute(`DELETE FROM schedules WHERE id = $1`, [id]);
+  } else {
+    memorySchedules.delete(id);
+  }
+}
+

@@ -27,6 +27,7 @@
     "global-shortcut:default",
     "fs:default",
     "fs:read-all",
-    "fs:write-all"
+    "fs:write-all",
+    "dialog:default"
   ]
 }

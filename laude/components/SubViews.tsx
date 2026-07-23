@@ -2,10 +2,11 @@
 
 import React, { useState } from 'react';
 import { 
-  FolderPlus, Trash2, Database, Save, Calendar, Clock, Share2, Eye
+  FolderPlus, Trash2, Calendar, Clock, Share2, Eye, Plus, Play, Info
 } from 'lucide-react';
 import { Project, ProjectFile } from '../app/types';
 import { SavedSchedule } from '../app/scheduler';
+import { Cron } from 'croner';
 
 interface SubViewsProps {
   viewType: 'projects' | 'artifacts' | 'schedules';
@@ -34,7 +35,10 @@ interface SubViewsProps {
   setNewSchedMode: (val: 'chat' | 'agent') => void;
   handleAddSchedule: () => void;
   handleDeleteSchedule: (id: string) => void;
+  handleToggleScheduleEnabled: (id: string, enabled: boolean) => void;
+  handleRunScheduleNow: (sched: SavedSchedule) => void;
   // Artifacts panel
+  realArtifactsList: { id: string; title: string; language: string; code: string; timestamp: number }[];
   setSelectedArtifact: (art: { language: string; code: string } | null) => void;
 }
 
@@ -63,11 +67,48 @@ export function SubViews({
   setNewSchedMode,
   handleAddSchedule,
   handleDeleteSchedule,
+  handleToggleScheduleEnabled,
+  handleRunScheduleNow,
+  realArtifactsList,
   setSelectedArtifact
 }: SubViewsProps) {
+  
+  // Schedule creator details
+  const [showScheduleBuilder, setShowScheduleBuilder] = useState(false);
+  const [cronPreviewLines, setCronPreviewLines] = useState<string[]>([]);
+
+  const handleCronChange = (val: string) => {
+    setNewSchedCron(val);
+    if (!val.trim()) {
+      setCronPreviewLines([]);
+      return;
+    }
+    try {
+      const c = new Cron(val);
+      const dates = [];
+      let next = c.nextRun();
+      for (let i = 0; i < 3; i++) {
+        if (next) {
+          dates.push(next.toLocaleString());
+          next = c.nextRun(next);
+        }
+      }
+      setCronPreviewLines(dates);
+    } catch {
+      setCronPreviewLines(['(Invalid cron pattern)']);
+    }
+  };
+
+  const getHumanReadableCadence = (cronExpr: string) => {
+    if (cronExpr === '0 9 * * *') return 'Daily at 09:00';
+    if (cronExpr === '0 18 * * 5') return 'Weekly on Fridays at 18:00';
+    if (cronExpr === '0 * * * *') return 'Every hour';
+    if (cronExpr === '*/2 * * * *') return 'Every 2 minutes';
+    return `Cron: ${cronExpr}`;
+  };
 
   return (
-    <div className="flex-1 flex flex-col bg-background text-foreground select-none overflow-y-auto p-8 space-y-6">
+    <div className="flex-1 flex flex-col bg-background text-foreground select-none overflow-y-auto p-8 space-y-6 font-sans">
       
       {/* PROJECTS MAIN VIEW */}
       {viewType === 'projects' && (
@@ -84,7 +125,6 @@ export function SubViews({
                   const name = prompt("Enter project name:");
                   if (name) {
                     setNewProjectName(name);
-                    // Trigger simulated create
                     setTimeout(handleCreateProject, 100);
                   }
                 }}
@@ -93,22 +133,6 @@ export function SubViews({
                 New project
               </button>
             </div>
-          </div>
-
-          {/* Search bar */}
-          <div className="relative">
-            <input 
-              type="text" 
-              placeholder="🔍 Search projects..." 
-              className="w-full bg-card-bg border border-border-color focus:border-accent rounded-xl px-4 py-2.5 text-xs text-foreground outline-none transition"
-            />
-          </div>
-
-          {/* Category Filter Tabs */}
-          <div className="flex items-center gap-4 border-b border-border-color/40 pb-2 text-xs font-bold uppercase tracking-wider text-foreground/45">
-            <span className="text-foreground border-b-2 border-accent pb-2 cursor-pointer">Your projects</span>
-            <span className="hover:text-foreground cursor-pointer">Organization</span>
-            <span className="hover:text-foreground cursor-pointer">Shared with you</span>
           </div>
 
           <div className="grid grid-cols-3 gap-6">
@@ -186,30 +210,109 @@ export function SubViews({
               <p className="text-xs text-foreground/50">Run automated prompt commands at custom periodic intervals locally.</p>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs text-foreground/60 cursor-pointer">Sort by Next run ▾</span>
               <button 
-                onClick={() => {
-                  const name = prompt("Enter scheduled task name:");
-                  if (name) {
-                    setNewSchedName(name);
-                  }
-                }}
+                onClick={() => setShowScheduleBuilder(!showScheduleBuilder)}
                 className="bg-accent hover:bg-accent-hover text-white text-xs font-bold px-3 py-2 rounded-lg transition"
               >
-                New task ▾
+                {showScheduleBuilder ? 'Close Builder' : 'New Task'} ▾
               </button>
             </div>
           </div>
 
+          {/* New Task Dialog / Schedule Builder Panel */}
+          {showScheduleBuilder && (
+            <div className="bg-card-bg border border-border-color rounded-xl p-4 space-y-3 text-xs animate-in slide-in-from-top-2 duration-150 shadow-sm">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/60">Schedule Automation Builder</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <span>Task Name</span>
+                  <input
+                    type="text"
+                    value={newSchedName}
+                    onChange={(e) => setNewSchedName(e.target.value)}
+                    placeholder="e.g. Daily Brief, Hourly check"
+                    className="w-full bg-background border border-border-color rounded-lg px-2.5 py-1.5 text-xs text-foreground outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <span>Cron Expression</span>
+                  <input
+                    type="text"
+                    value={newSchedCron}
+                    onChange={(e) => handleCronChange(e.target.value)}
+                    placeholder="e.g. */5 * * * *"
+                    className="w-full bg-background border border-border-color rounded-lg px-2.5 py-1.5 text-xs text-foreground font-mono outline-none"
+                  />
+                </div>
+
+                <div className="col-span-2 space-y-1">
+                  <span>Execution Prompt</span>
+                  <textarea
+                    value={newSchedPrompt}
+                    onChange={(e) => setNewSchedPrompt(e.target.value)}
+                    placeholder="System prompt instruction details..."
+                    rows={2}
+                    className="w-full bg-background border border-border-color rounded-lg px-2.5 py-1.5 text-xs text-foreground outline-none resize-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <span>Run Mode</span>
+                  <select
+                    value={newSchedMode}
+                    onChange={(e) => setNewSchedMode(e.target.value as any)}
+                    className="w-full bg-sidebar border border-border-color rounded-lg p-2 text-xs text-foreground"
+                  >
+                    <option value="chat">Chat Mode</option>
+                    <option value="agent">Agent Mode</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-foreground/40 uppercase block">Presets Quick-apply</span>
+                  <div className="flex gap-1.5">
+                    <button 
+                      onClick={() => handleCronChange('0 9 * * *')} 
+                      className="bg-sidebar border border-border-color px-2 py-1 rounded text-[10px]"
+                    >
+                      Daily 9am
+                    </button>
+                    <button 
+                      onClick={() => handleCronChange('*/2 * * * *')} 
+                      className="bg-sidebar border border-border-color px-2 py-1 rounded text-[10px]"
+                    >
+                      2 Min
+                    </button>
+                  </div>
+                </div>
+
+                {cronPreviewLines.length > 0 && (
+                  <div className="col-span-2 bg-sidebar/55 border border-border-color p-2 rounded-lg text-[10px] font-mono text-foreground/60 space-y-0.5">
+                    <div className="font-bold">Next 3 runs preview:</div>
+                    {cronPreviewLines.map((line, idx) => (
+                      <div key={idx}>• {line}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button 
+                onClick={() => {
+                  handleAddSchedule();
+                  setShowScheduleBuilder(false);
+                }} 
+                className="w-full bg-accent hover:bg-accent-hover text-white text-xs font-bold py-2 rounded-lg transition"
+              >
+                Save Schedule
+              </button>
+            </div>
+          )}
+
           {/* Execution Environment Banner */}
-          <div className="flex items-center justify-between bg-card-bg border border-border-color p-3.5 rounded-xl text-xs text-foreground/80">
+          <div className="flex items-center justify-between bg-card-bg border border-border-color p-3.5 rounded-xl text-xs text-foreground/80 shadow-xs">
             <span className="flex items-center gap-2">
               <span className="text-amber-500 font-bold">⚠</span> Scheduled tasks only run while your computer is awake and online.
             </span>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-foreground/40 font-bold uppercase tracking-wider">Keep awake</span>
-              <input type="checkbox" className="rounded border-border-color focus:ring-accent accent-accent w-4 h-4 cursor-pointer" defaultChecked />
-            </div>
           </div>
 
           {/* Empty State Canvas / Grid list */}
@@ -248,17 +351,43 @@ export function SubViews({
           ) : (
             <div className="grid grid-cols-2 gap-4">
               {schedulesList.map((sched) => (
-                <div key={sched.id} className="bg-card-bg border border-border-color rounded-xl p-4 flex flex-col justify-between h-36">
+                <div key={sched.id} className="bg-card-bg border border-border-color rounded-xl p-4 flex flex-col justify-between h-40 shadow-xs">
                   <div>
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-foreground text-sm">{sched.name}</span>
-                      <span className="text-[10px] font-mono bg-sidebar px-2 py-0.5 rounded border border-border-color">{sched.cronExpression}</span>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="font-bold text-foreground text-sm block">{sched.name}</span>
+                        <span className="text-[10px] text-foreground/45 mt-0.5 block">{getHumanReadableCadence(sched.cronExpression)}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          checked={sched.enabled}
+                          onChange={(e) => handleToggleScheduleEnabled(sched.id, e.target.checked)}
+                          className="rounded border-border-color text-accent focus:ring-accent accent-accent w-4 h-4 cursor-pointer"
+                        />
+                        <span className="text-[9px] uppercase tracking-wider text-foreground/40 font-bold">Enabled</span>
+                      </div>
                     </div>
-                    <p className="text-xs text-foreground/50 mt-2 line-clamp-2 italic">"{sched.prompt}"</p>
+                    <p className="text-xs text-foreground/50 mt-2.5 line-clamp-2 italic">"{sched.prompt}"</p>
                   </div>
                   <div className="flex justify-between items-center text-[10px] text-foreground/40 pt-2 border-t border-border-color/10 font-bold uppercase tracking-wider">
-                    <span>Mode: {sched.mode}</span>
-                    <button onClick={() => handleDeleteSchedule(sched.id)} className="text-rose-500 hover:underline">Delete</button>
+                    <span className="flex items-center gap-1">
+                      Mode: {sched.mode}
+                      {sched.lastRunStatus && (
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] ${sched.lastRunStatus === 'success' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                          {sched.lastRunStatus}
+                        </span>
+                      )}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => handleRunScheduleNow(sched)}
+                        className="text-accent hover:underline flex items-center gap-0.5"
+                      >
+                        <Play className="w-2.5 h-2.5" /> Run Now
+                      </button>
+                      <button onClick={() => handleDeleteSchedule(sched.id)} className="text-rose-500 hover:underline">Delete</button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -275,40 +404,31 @@ export function SubViews({
               <h2 className="text-2xl font-serif font-bold text-foreground">Artifacts</h2>
               <p className="text-xs text-foreground/50">Browse code blocks and responsive content generated by assistant models.</p>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-foreground/60 cursor-pointer">Filter by All ▾</span>
-              <span className="text-xs text-accent hover:underline cursor-pointer">Import from link</span>
-              <button className="bg-accent hover:bg-accent-hover text-white text-xs font-bold px-3 py-2 rounded-lg transition">New artifact ▾</button>
-            </div>
-          </div>
-
-          <div className="relative">
-            <input 
-              type="text" 
-              placeholder="🔍 Search artifacts..." 
-              className="w-full bg-card-bg border border-border-color focus:border-accent rounded-xl px-4 py-2.5 text-xs text-foreground outline-none transition"
-            />
           </div>
 
           {/* Interactive Card Matrix */}
-          <div className="grid grid-cols-3 gap-6">
-            <div className="bg-card-bg border border-border-color hover:border-accent/40 rounded-xl p-4 flex flex-col justify-between h-40 cursor-pointer transition">
-              <div>
-                <span className="text-[9px] font-bold uppercase tracking-wider bg-accent/15 text-accent px-1.5 py-0.5 rounded">Chat</span>
-                <h4 className="font-bold text-foreground text-sm mt-2 truncate">System design plan diagram</h4>
-                <p className="text-xs text-foreground/50 mt-1 line-clamp-2">Mermaid layout mapping of the micro-agent connection layers...</p>
-              </div>
-              <span className="text-[10px] text-foreground/45 mt-2">Edited 2 hrs ago</span>
+          {realArtifactsList.length === 0 ? (
+            <div className="bg-card-bg border border-border-color rounded-2xl p-12 text-center text-xs text-foreground/40 italic shadow-xs">
+              No code or markdown artifacts found in conversation history database.
             </div>
-            <div className="bg-card-bg border border-border-color hover:border-accent/40 rounded-xl p-4 flex flex-col justify-between h-40 cursor-pointer transition">
-              <div>
-                <span className="text-[9px] font-bold uppercase tracking-wider bg-accent/15 text-accent px-1.5 py-0.5 rounded">Chat</span>
-                <h4 className="font-bold text-foreground text-sm mt-2 truncate">Database backup exporter</h4>
-                <p className="text-xs text-foreground/50 mt-1 line-clamp-2">Node.js file handler utility function to format schemas into JSON blobs...</p>
-              </div>
-              <span className="text-[10px] text-foreground/45 mt-2">Edited 1 day ago</span>
+          ) : (
+            <div className="grid grid-cols-3 gap-6 animate-in fade-in duration-200">
+              {realArtifactsList.map((art) => (
+                <div 
+                  key={art.id}
+                  onClick={() => setSelectedArtifact({ language: art.language, code: art.code })}
+                  className="bg-card-bg border border-border-color hover:border-accent/40 rounded-xl p-4 flex flex-col justify-between h-40 cursor-pointer transition shadow-xs"
+                >
+                  <div>
+                    <span className="text-[9px] font-bold uppercase tracking-wider bg-accent/15 text-accent px-1.5 py-0.5 rounded">{art.language}</span>
+                    <h4 className="font-bold text-foreground text-sm mt-2.5 truncate">{art.title}</h4>
+                    <p className="text-xs text-foreground/50 mt-1 line-clamp-2">{art.code.slice(0, 100)}...</p>
+                  </div>
+                  <span className="text-[10px] text-foreground/45 mt-2">Generated {new Date(art.timestamp).toLocaleDateString()}</span>
+                </div>
+              ))}
             </div>
-          </div>
+          )}
         </div>
       )}
       

@@ -20,7 +20,7 @@ import { readTextOrFile } from './attachments';
 import { ingestProjectFile, queryRelevantChunks } from './rag';
 import { BUILTIN_TOOLS, executeToolLocally } from './agent';
 import { getMcpServers, saveMcpServer, deleteMcpServer, connectMcpServer, executeMcpTool, getLoadedMcpTools, McpServerConfig } from './mcp';
-import { getSchedules, saveSchedule, deleteSchedule, triggerNotification, SavedSchedule } from './scheduler';
+import { getSchedules, saveSchedule, deleteSchedule, triggerNotification, SavedSchedule, initScheduler } from './scheduler';
 
 export default function Home() {
   // Navigation states
@@ -61,6 +61,8 @@ export default function Home() {
 
   // Memory
   const [userMemoryText, setUserMemoryText] = useState<string>('');
+  const [userName, setUserName] = useState<string>('Claude Senior');
+  const [userCallName, setUserCallName] = useState<string>('Claude');
 
   // Agent Mode config
   const [agentMode, setAgentMode] = useState<boolean>(false);
@@ -136,8 +138,15 @@ export default function Home() {
       const memory = await loadUserMemory();
       setUserMemoryText(memory);
       
-      // Load MCP Servers and Schedules list
+      // Load MCP Servers and init Schedules list via croner engine
       setMcpServers(getMcpServers());
+      await initScheduler((newConv, msgs) => {
+        setConversations(prev => [newConv, ...prev]);
+        setSchedulesList([...getSchedules()]);
+        if (activeConvId === null) {
+          setActiveConvId(newConv.id);
+        }
+      });
       setSchedulesList(getSchedules());
 
       // Load LLM Providers
@@ -157,30 +166,6 @@ export default function Home() {
       setActiveProviderName(activeP.name);
       ollamaClient.setProvider(activeP);
     })();
-  }, []);
-
-  // Background automation tick simulator checking schedules
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const activeScheds = getSchedules();
-      const now = Date.now();
-      activeScheds.forEach(async (sched) => {
-        // Run simulated hourly/daily tasks
-        if (!sched.lastRunTime || now - sched.lastRunTime > 300000) { // 5 minutes mock spacing
-          sched.lastRunTime = now;
-          sched.lastRunStatus = 'success';
-          saveSchedule(sched);
-          setSchedulesList([...getSchedules()]);
-          
-          // Trigger OS notification alert
-          await triggerNotification(
-            `Automated Task Run: ${sched.name}`,
-            `Laude successfully ran prompt: "${sched.prompt.slice(0, 30)}..." using ${sched.model}.`
-          );
-        }
-      });
-    }, 15000);
-    return () => clearInterval(timer);
   }, []);
 
   // Load messages when active conversation changes
@@ -261,6 +246,15 @@ export default function Home() {
         .map((c) => (c.id === conv.id ? updated : c))
         .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.updated_at - a.updated_at)
     );
+  }
+
+  async function handleRenameChat(id: string, newTitle: string) {
+    const conv = conversations.find(c => c.id === id);
+    if (conv) {
+      const updated = { ...conv, title: newTitle, updated_at: Date.now() };
+      await saveConversation(updated);
+      setConversations((prev) => prev.map((c) => (c.id === id ? updated : c)));
+    }
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -434,6 +428,54 @@ export default function Home() {
     };
   }
 
+  // Parameter presets configuration temporary state
+  const [tempPreset, setTempPreset] = useState<ModelPreset>({
+    id: 'default',
+    name: 'Default Balanced',
+    temperature: 0.7,
+    top_p: 0.9,
+    top_k: 40,
+    num_ctx: 4096,
+    repeat_penalty: 1.1,
+    system_prompt: 'You are a helpful precise assistant.',
+  });
+
+  async function handleSaveCustomPreset(name: string) {
+    const newPreset: ModelPreset = {
+      ...tempPreset,
+      id: 'preset_' + Date.now(),
+      name
+    };
+    await savePreset(newPreset);
+    setPresets((prev) => [...prev, newPreset]);
+    setActivePreset(newPreset);
+  }
+
+  async function handlePickWorkspace() {
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ !== undefined;
+    if (isTauri) {
+      try {
+        const { open } = await import('@tauri-apps/plugin-dialog');
+        const selected = await open({
+          directory: true,
+          multiple: false
+        });
+        if (selected && typeof selected === 'string') {
+          setWorkspaceDir(selected);
+        }
+      } catch (e) {
+        console.warn('Tauri open folder dialog failed:', e);
+      }
+    } else {
+      const path = prompt('Enter sandbox folder path manually:', workspaceDir);
+      if (path) setWorkspaceDir(path);
+    }
+  }
+
+  function handlePullModelDialog() {
+    setShowSettings(true);
+  }
+
   // Schedule task handlers
   function handleAddSchedule() {
     if (!newSchedName.trim() || !newSchedPrompt.trim()) return;
@@ -444,6 +486,7 @@ export default function Home() {
       prompt: newSchedPrompt.trim(),
       model: selectedModel || 'qwen2.5:14b',
       mode: newSchedMode,
+      enabled: true,
     };
     saveSchedule(sched);
     setSchedulesList([...getSchedules()]);
@@ -455,6 +498,47 @@ export default function Home() {
   function handleDeleteSchedule(id: string) {
     deleteSchedule(id);
     setSchedulesList([...getSchedules()]);
+  }
+
+  // Build database-driven list of real artifacts from conversation message strings
+  const getRealArtifacts = () => {
+    const list: { id: string; title: string; language: string; code: string; timestamp: number }[] = [];
+    messages.forEach((msg) => {
+      // Find code blocks inside message content
+      const matches = msg.content.matchAll(/```(\w+)\s+title="([^"]+)"\s*\n([\s\S]*?)\n```/g);
+      for (const m of matches) {
+        list.push({
+          id: msg.id + '_' + m[2],
+          title: m[2],
+          language: m[1],
+          code: m[3],
+          timestamp: msg.timestamp
+        });
+      }
+    });
+    return list;
+  };
+
+  async function handleToggleScheduleEnabled(id: string, enabled: boolean) {
+    const sched = schedulesList.find(s => s.id === id);
+    if (sched) {
+      sched.enabled = enabled;
+      await saveSchedule(sched, (newConv, msgs) => {
+        setConversations(prev => [newConv, ...prev]);
+        setSchedulesList([...getSchedules()]);
+      });
+      setSchedulesList([...getSchedules()]);
+    }
+  }
+
+  async function handleRunScheduleNow(sched: SavedSchedule) {
+    const { executeScheduleTask } = await import('./scheduler');
+    await executeScheduleTask(sched, (newConv, msgs) => {
+      setConversations(prev => [newConv, ...prev]);
+      setSchedulesList([...getSchedules()]);
+      setActiveConvId(newConv.id);
+      setMainView('chat');
+    });
   }
 
   async function handleSendMessage() {
@@ -768,6 +852,9 @@ If you have completed your task, reply normally without any JSON block.
         setMainView={setMainView}
         setAgentMode={setAgentMode}
         setShowLogsPanel={setShowLogsPanel}
+        handleRenameChat={handleRenameChat}
+        handleBackupExport={handleBackupExport}
+        handleBackupImport={handleBackupImport}
       />
 
       {/* 2. Main content view controller */}
@@ -811,8 +898,14 @@ If you have completed your task, reply normally without any JSON block.
               projects={projects}
               activeProjectId={activeProjectId}
               setActiveProjectId={setActiveProjectId}
-              showBrowserWarning={showBrowserWarning}
-              setShowBrowserWarning={setShowBrowserWarning}
+              isConnected={isConnected}
+              checkOllamaHealth={checkOllamaHealth}
+              workspaceDir={workspaceDir}
+              handlePickWorkspace={handlePickWorkspace}
+              tempPreset={tempPreset}
+              setTempPreset={setTempPreset}
+              handleSaveCustomPreset={handleSaveCustomPreset}
+              handlePullModelDialog={handlePullModelDialog}
             />
           </>
         ) : (
@@ -841,6 +934,9 @@ If you have completed your task, reply normally without any JSON block.
             setNewSchedMode={setNewSchedMode}
             handleAddSchedule={handleAddSchedule}
             handleDeleteSchedule={handleDeleteSchedule}
+            handleToggleScheduleEnabled={handleToggleScheduleEnabled}
+            handleRunScheduleNow={handleRunScheduleNow}
+            realArtifactsList={getRealArtifacts()}
             setSelectedArtifact={setSelectedArtifact}
           />
         )}
@@ -900,6 +996,20 @@ If you have completed your task, reply normally without any JSON block.
         setActivePreset={setActivePreset}
         handleBackupExport={handleBackupExport}
         handleBackupImport={handleBackupImport}
+        userName={userName}
+        setUserName={setUserName}
+        userCallName={userCallName}
+        setUserCallName={setUserCallName}
+        conversationsCount={conversations.length}
+        totalGeneratedTokens={1358}
+        mcpServers={mcpServers}
+        setMcpServers={setMcpServers}
+        newMcpName={newMcpName}
+        setNewMcpName={setNewMcpName}
+        newMcpCommand={newMcpCommand}
+        setNewMcpCommand={setNewMcpCommand}
+        newMcpArgs={newMcpArgs}
+        setNewMcpArgs={setNewMcpArgs}
       />
 
       {/* 5. Floating Artifact side preview iframe */}

@@ -2,9 +2,10 @@
 
 import React, { useState } from 'react';
 import { 
-  Home as HomeIcon, Code, Plus, FolderOpen, Share2, Calendar, Settings, Pin, MessageSquare, Trash2, ChevronDown
+  Home as HomeIcon, Code, Plus, FolderOpen, Share2, Calendar, Settings, Pin, MessageSquare, Trash2, ChevronDown, Edit2, Check, Sun, Moon, Sparkles, LogOut, Database, Upload, ArrowRightLeft
 } from 'lucide-react';
 import { Conversation } from '../app/types';
+import { useTheme } from '../app/ThemeProvider';
 
 interface SidebarProps {
   activeTab: 'home' | 'code';
@@ -15,6 +16,7 @@ interface SidebarProps {
   handleCreateNewChat: () => void;
   handleTogglePin: (conv: Conversation, e: React.MouseEvent) => void;
   handleDeleteChat: (id: string, e: React.MouseEvent) => void;
+  handleRenameChat: (id: string, newTitle: string) => void;
   isConnected: boolean | null;
   ollamaVersion: string;
   activeProviderName: string;
@@ -23,6 +25,9 @@ interface SidebarProps {
   mainView: 'chat' | 'projects' | 'artifacts' | 'schedules';
   setAgentMode: (mode: boolean) => void;
   setShowLogsPanel: (show: boolean) => void;
+  // DB actions
+  handleBackupExport: () => void;
+  handleBackupImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export function Sidebar({
@@ -34,6 +39,7 @@ export function Sidebar({
   handleCreateNewChat,
   handleTogglePin,
   handleDeleteChat,
+  handleRenameChat,
   isConnected,
   ollamaVersion,
   activeProviderName,
@@ -41,11 +47,18 @@ export function Sidebar({
   setMainView,
   mainView,
   setAgentMode,
-  setShowLogsPanel
+  setShowLogsPanel,
+  handleBackupExport,
+  handleBackupImport
 }: SidebarProps) {
   const [showAccountPopover, setShowAccountPopover] = useState(false);
-  const pinnedConvs = conversations.filter(c => c.pinned);
-  const recentConvs = conversations.filter(c => !c.pinned);
+  const [sortAlphabetical, setSortAlphabetical] = useState(false);
+  const [editingChatId, setEditingChatId] = useState<string | null>(null);
+  const [editTitleText, setEditTitleText] = useState('');
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const { theme, setTheme } = useTheme();
 
   const handleTabClick = (tab: 'home' | 'code') => {
     setActiveTab(tab);
@@ -59,10 +72,45 @@ export function Sidebar({
     }
   };
 
+  // Filter conversations by search input query
+  const filteredConvs = conversations.filter(c => {
+    if (!searchQuery.trim()) return true;
+    return c.title.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  const pinnedConvs = filteredConvs.filter(c => c.pinned);
+  const recentConvs = filteredConvs.filter(c => !c.pinned);
+
+  // Apply sorting algorithm
+  const sortFn = (a: Conversation, b: Conversation) => {
+    if (sortAlphabetical) {
+      return a.title.localeCompare(b.title);
+    }
+    return b.updated_at - a.updated_at;
+  };
+
+  const sortedPinned = [...pinnedConvs].sort(sortFn);
+  const sortedRecents = [...recentConvs].sort(sortFn);
+
+  const startRename = (conv: Conversation, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingChatId(conv.id);
+    setEditTitleText(conv.title);
+    setActiveMenuId(null);
+  };
+
+  const saveRename = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (editTitleText.trim()) {
+      handleRenameChat(id, editTitleText.trim());
+    }
+    setEditingChatId(null);
+  };
+
   return (
-    <aside className="w-[250px] bg-sidebar border-r border-border-color flex flex-col h-full shrink-0 select-none text-foreground">
+    <aside className="w-[250px] bg-sidebar border-r border-border-color flex flex-col h-full shrink-0 select-none text-foreground font-sans">
       {/* A. Header & View Toggle (Top Left) */}
-      <div className="p-4 space-y-3">
+      <div className="p-4 space-y-3 shrink-0">
         <div className="grid grid-cols-2 gap-1 bg-background/50 p-1 rounded-xl border border-border-color">
           <button
             onClick={() => handleTabClick('home')}
@@ -98,7 +146,7 @@ export function Sidebar({
       </div>
 
       {/* B. Workspace Navigation List */}
-      <div className="px-2 space-y-0.5">
+      <div className="px-2 space-y-0.5 shrink-0">
         <button
           onClick={() => setMainView('projects')}
           className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition ${
@@ -138,32 +186,81 @@ export function Sidebar({
       </div>
 
       {/* C. Pinned & Recents Navigation Groups */}
-      <div className="flex-1 overflow-y-auto px-2 py-4 space-y-4">
-        {pinnedConvs.length > 0 && (
+      <div className="flex-1 overflow-y-auto px-2 py-4 space-y-4 min-h-0">
+        {/* Real Search Input at the top of the Recents list */}
+        <div className="px-2 mb-2">
+          <input
+            type="text"
+            placeholder="Search conversations..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-background/50 border border-border-color/70 rounded-lg px-2.5 py-1 text-xs text-foreground outline-none focus:border-accent/40 placeholder:text-foreground/35"
+          />
+        </div>
+
+        {sortedPinned.length > 0 && (
           <div className="space-y-1">
             <span className="text-[10px] font-bold text-foreground/40 px-3 uppercase tracking-wider block">Pinned</span>
-            {pinnedConvs.map((conv) => (
+            {sortedPinned.map((conv) => (
               <div
                 key={conv.id}
                 onClick={() => { setMainView('chat'); setActiveConvId(conv.id); }}
-                className={`group flex items-center justify-between px-3 py-1.5 rounded-lg text-xs cursor-pointer transition ${
+                className={`group flex items-center justify-between px-3 py-1.5 rounded-lg text-xs cursor-pointer transition relative ${
                   activeConvId === conv.id && mainView === 'chat'
                     ? 'bg-background text-foreground font-semibold shadow-xs'
                     : 'text-foreground/75 hover:bg-background/30'
                 }`}
               >
-                <div className="flex items-center gap-2 overflow-hidden">
+                <div className="flex items-center gap-2 overflow-hidden flex-1 mr-2">
                   <MessageSquare className="w-3.5 h-3.5 shrink-0 text-foreground/35" />
-                  <span className="truncate">{conv.title}</span>
+                  {editingChatId === conv.id ? (
+                    <input
+                      type="text"
+                      value={editTitleText}
+                      onChange={(e) => setEditTitleText(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') saveRename(conv.id, e as any);
+                      }}
+                      className="bg-sidebar border border-border-color rounded px-1.5 py-0.5 text-xs text-foreground w-full outline-none focus:border-accent"
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="truncate">{conv.title}</span>
+                  )}
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                  <button onClick={(e) => handleTogglePin(conv, e)} className="p-0.5 text-accent">
-                    <Pin className="w-3 h-3" />
-                  </button>
-                  <button onClick={(e) => handleDeleteChat(conv.id, e)} className="p-0.5 text-foreground/40 hover:text-rose-500">
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  {editingChatId === conv.id ? (
+                    <button onClick={(e) => saveRename(conv.id, e)} className="p-0.5 text-emerald-500 hover:text-emerald-400">
+                      <Check className="w-3 h-3" />
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === conv.id ? null : conv.id); }}
+                        className="p-0.5 text-foreground/45 hover:text-foreground font-bold"
+                      >
+                        …
+                      </button>
+                    </div>
+                  )}
                 </div>
+
+                {/* Inline Hover Menu popover */}
+                {activeMenuId === conv.id && (
+                  <div className="absolute right-2 top-8 bg-card-bg border border-border-color rounded-lg shadow-lg py-1 z-50 text-[11px] w-24">
+                    <button onClick={(e) => handleTogglePin(conv, e)} className="w-full text-left px-2.5 py-1 hover:bg-sidebar transition flex items-center gap-1.5">
+                      <Pin className="w-3 h-3 text-accent" /> Unpin
+                    </button>
+                    <button onClick={(e) => startRename(conv, e)} className="w-full text-left px-2.5 py-1 hover:bg-sidebar transition flex items-center gap-1.5">
+                      <Edit2 className="w-3 h-3" /> Rename
+                    </button>
+                    <button onClick={(e) => handleDeleteChat(conv.id, e)} className="w-full text-left px-2.5 py-1 hover:bg-sidebar text-rose-500 hover:bg-rose-950/20 transition flex items-center gap-1.5">
+                      <Trash2 className="w-3 h-3" /> Delete
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -172,33 +269,76 @@ export function Sidebar({
         <div className="space-y-1">
           <div className="flex justify-between items-center px-3 mb-1">
             <span className="text-[10px] font-bold text-foreground/40 uppercase tracking-wider">Recents</span>
-            <span className="text-[10px] text-foreground/40 hover:text-foreground cursor-pointer font-bold">⇅</span>
+            <button 
+              onClick={() => setSortAlphabetical(!sortAlphabetical)}
+              className="text-[10px] text-foreground/40 hover:text-foreground cursor-pointer font-bold bg-transparent border-none p-0 flex items-center gap-0.5"
+              title="Toggle Sort Mode"
+            >
+              <ArrowRightLeft className="w-2.5 h-2.5" />
+            </button>
           </div>
-          {recentConvs.length === 0 ? (
+          {sortedRecents.length === 0 ? (
             <span className="text-[10px] text-foreground/30 px-3 italic block">No recent chats</span>
           ) : (
-            recentConvs.map((conv) => (
+            sortedRecents.map((conv) => (
               <div
                 key={conv.id}
                 onClick={() => { setMainView('chat'); setActiveConvId(conv.id); }}
-                className={`group flex items-center justify-between px-3 py-1.5 rounded-lg text-xs cursor-pointer transition ${
+                className={`group flex items-center justify-between px-3 py-1.5 rounded-lg text-xs cursor-pointer transition relative ${
                   activeConvId === conv.id && mainView === 'chat'
                     ? 'bg-background text-foreground font-semibold shadow-xs'
                     : 'text-foreground/75 hover:bg-background/30'
                 }`}
               >
-                <div className="flex items-center gap-2 overflow-hidden">
+                <div className="flex items-center gap-2 overflow-hidden flex-1 mr-2">
                   <MessageSquare className="w-3.5 h-3.5 shrink-0 text-foreground/35" />
-                  <span className="truncate">{conv.title}</span>
+                  {editingChatId === conv.id ? (
+                    <input
+                      type="text"
+                      value={editTitleText}
+                      onChange={(e) => setEditTitleText(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') saveRename(conv.id, e as any);
+                      }}
+                      className="bg-sidebar border border-border-color rounded px-1.5 py-0.5 text-xs text-foreground w-full outline-none focus:border-accent"
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="truncate">{conv.title}</span>
+                  )}
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                  <button onClick={(e) => handleTogglePin(conv, e)} className="p-0.5 text-foreground/40 hover:text-accent">
-                    <Pin className="w-3 h-3" />
-                  </button>
-                  <button onClick={(e) => handleDeleteChat(conv.id, e)} className="p-0.5 text-foreground/40 hover:text-rose-500">
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  {editingChatId === conv.id ? (
+                    <button onClick={(e) => saveRename(conv.id, e)} className="p-0.5 text-emerald-500 hover:text-emerald-400">
+                      <Check className="w-3 h-3" />
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === conv.id ? null : conv.id); }}
+                        className="p-0.5 text-foreground/45 hover:text-foreground font-bold"
+                      >
+                        …
+                      </button>
+                    </div>
+                  )}
                 </div>
+
+                {activeMenuId === conv.id && (
+                  <div className="absolute right-2 top-8 bg-card-bg border border-border-color rounded-lg shadow-lg py-1 z-50 text-[11px] w-24">
+                    <button onClick={(e) => handleTogglePin(conv, e)} className="w-full text-left px-2.5 py-1 hover:bg-sidebar transition flex items-center gap-1.5">
+                      <Pin className="w-3 h-3" /> Pin
+                    </button>
+                    <button onClick={(e) => startRename(conv, e)} className="w-full text-left px-2.5 py-1 hover:bg-sidebar transition flex items-center gap-1.5">
+                      <Edit2 className="w-3 h-3" /> Rename
+                    </button>
+                    <button onClick={(e) => handleDeleteChat(conv.id, e)} className="w-full text-left px-2.5 py-1 hover:bg-sidebar text-rose-500 hover:bg-rose-950/20 transition flex items-center gap-1.5">
+                      <Trash2 className="w-3 h-3" /> Delete
+                    </button>
+                  </div>
+                )}
               </div>
             ))
           )}
@@ -206,22 +346,7 @@ export function Sidebar({
       </div>
 
       {/* D. Bottom Status & Account Dock */}
-      {/* Update Banner Slot */}
-      <div className="px-2 pb-1">
-        <div className="flex items-center justify-between bg-accent/10 border border-accent/20 rounded-lg p-2 text-[10px] text-accent font-semibold cursor-pointer hover:bg-accent/15 transition">
-          <span>Relaunch to update v1.24012.1</span>
-          <span>→</span>
-        </div>
-      </div>
-
-      {/* Sub-Navigation Links */}
-      <div className="px-4 py-2 border-t border-border-color/30 flex items-center justify-center gap-2 text-[10px] text-foreground/40 font-bold uppercase tracking-wider">
-        <span className="hover:text-foreground cursor-pointer">Design</span>
-        <span className="text-border-color/50">|</span>
-        <span className="hover:text-foreground cursor-pointer">Labs</span>
-      </div>
-
-      <div className="p-2 border-t border-border-color/50 relative bg-sidebar">
+      <div className="p-2 border-t border-border-color/50 relative bg-sidebar shrink-0">
         <button
           onClick={() => setShowAccountPopover(!showAccountPopover)}
           className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-background/40 transition text-left"
@@ -232,9 +357,11 @@ export function Sidebar({
             </div>
             <div className="overflow-hidden">
               <div className="text-xs font-semibold truncate text-foreground">Digital South Trust</div>
-              <div className="text-[10px] text-foreground/50 flex items-center gap-1">
-                <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                {isConnected ? 'Ollama Online' : 'Offline'}
+              <div className="text-[10px] text-foreground/50 flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${
+                  isConnected === null ? 'bg-amber-500 animate-pulse' : isConnected ? 'bg-emerald-500' : 'bg-rose-500'
+                }`} />
+                {isConnected === null ? 'Connecting...' : isConnected ? 'Ollama Online' : 'Ollama Offline'}
               </div>
             </div>
           </div>
@@ -243,18 +370,46 @@ export function Sidebar({
 
         {showAccountPopover && (
           <div className="absolute bottom-14 left-2 right-2 bg-card-bg border border-border-color rounded-xl shadow-lg p-2.5 z-40 space-y-1.5 text-xs text-foreground">
-            <div className="px-2 py-1 font-bold text-foreground/50 text-[10px] uppercase">Connection Info</div>
-            <div className="px-2 pb-2 border-b border-border-color/50 space-y-0.5">
+            <div className="px-2 py-1 font-bold text-foreground/50 text-[10px] uppercase tracking-wider">Workspace Dock</div>
+            
+            <div className="px-2 pb-2 border-b border-border-color/50 space-y-1 font-mono text-[10px] text-foreground/60">
               <div>Ollama Base: {isConnected ? `v${ollamaVersion}` : 'Offline'}</div>
-              <div className="text-[10px] text-foreground/50">Active Provider: {activeProviderName}</div>
+              <div>Active LLM: {activeProviderName}</div>
             </div>
-            <button
-              onClick={() => { setShowAccountPopover(false); setShowSettings(true); }}
-              className="w-full text-left px-2 py-1.5 rounded hover:bg-sidebar transition text-foreground"
-            >
-              Settings
-            </button>
-            <div className="text-[10px] text-foreground/40 px-2 pt-1">Laude Desktop v0.1.0</div>
+
+            <div className="grid grid-cols-2 gap-1 py-1">
+              <button 
+                onClick={() => { setTheme(theme === 'dark' ? 'light' : 'dark'); setShowAccountPopover(false); }}
+                className="flex items-center justify-center gap-1.5 py-1 rounded hover:bg-sidebar transition text-foreground"
+              >
+                {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+                Theme
+              </button>
+              <button 
+                onClick={() => { setShowAccountPopover(false); setShowSettings(true); }}
+                className="flex items-center justify-center gap-1.5 py-1 rounded hover:bg-sidebar transition text-foreground"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                Settings
+              </button>
+            </div>
+
+            <div className="border-t border-border-color/50 pt-2 grid grid-cols-2 gap-1">
+              <button 
+                onClick={() => { setShowAccountPopover(false); handleBackupExport(); }}
+                className="flex items-center justify-center gap-1.5 py-1 rounded hover:bg-sidebar transition text-[10px] font-bold text-foreground/70"
+              >
+                <Database className="w-3 h-3" /> Export
+              </button>
+              <label className="flex items-center justify-center gap-1.5 py-1 rounded hover:bg-sidebar transition text-[10px] font-bold text-foreground/70 cursor-pointer">
+                <Upload className="w-3 h-3" /> Import
+                <input type="file" onChange={(e) => { setShowAccountPopover(false); handleBackupImport(e); }} accept=".json" className="hidden" />
+              </label>
+            </div>
+            
+            <div className="text-[9px] text-foreground/45 px-2 pt-1 border-t border-border-color/20 text-center font-mono">
+              Laude Desktop v1.0.0
+            </div>
           </div>
         )}
       </div>
