@@ -3,7 +3,6 @@
   "productName": "vega",
   "version": "0.1.0",
   "identifier": "com.vega.app",
-  //  "identifier": "com.vega.app",
   "build": {
     "frontendDist": "../out",
     "devUrl": "http://localhost:3000",

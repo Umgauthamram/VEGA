@@ -1,56 +1,66 @@
-use tauri::{Manager, Emitter};
+use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  tauri::Builder::default()
-    .setup(|app| {
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
-      }
-      app.handle().plugin(tauri_plugin_sql::Builder::default().build())?;
-      app.handle().plugin(tauri_plugin_shell::init())?;
-      app.handle().plugin(tauri_plugin_fs::init())?;
-      app.handle().plugin(tauri_plugin_dialog::init())?;
-      app.handle().plugin(tauri_plugin_notification::init())?;
-      app.handle().plugin(tauri_plugin_global_shortcut::Builder::new().build())?;
-
-      // Register system tray menu items
-      let tray_menu = tauri::menu::Menu::with_id(app.handle(), "tray")?;
-      let show = tauri::menu::MenuItem::with_id(app.handle(), "show", "Show VEGA", true, None::<&str>)?;
-      let quit = tauri::menu::MenuItem::with_id(app.handle(), "quit", "Quit", true, None::<&str>)?;
-      tray_menu.append(&show)?;
-      tray_menu.append(&quit)?;
-
-      let _tray = tauri::tray::TrayIconBuilder::with_id("main_tray")
-        .menu(&tray_menu)
-        .on_menu_event(|app, event| match event.id.as_ref() {
-          "show" => {
-            if let Some(webview) = app.get_webview_window("main") {
-              let _ = webview.show();
-              let _ = webview.set_focus();
+    tauri::Builder::default()
+        .plugin(tauri_plugin_http::init())
+        .setup(|app| {
+            if cfg!(debug_assertions) {
+                app.handle().plugin(
+                    tauri_plugin_log::Builder::default()
+                        .level(log::LevelFilter::Info)
+                        .build(),
+                )?;
             }
-          }
-          "quit" => {
-            app.exit(0);
-          }
-          _ => {}
-        })
-        .build(app)?;
+            app.handle()
+                .plugin(tauri_plugin_sql::Builder::default().build())?;
+            app.handle().plugin(tauri_plugin_shell::init())?;
+            app.handle().plugin(tauri_plugin_fs::init())?;
+            app.handle().plugin(tauri_plugin_dialog::init())?;
+            app.handle().plugin(tauri_plugin_notification::init())?;
+            app.handle()
+                .plugin(tauri_plugin_global_shortcut::Builder::new().build())?;
 
-      Ok(())
-    })
-    .invoke_handler(tauri::generate_handler![mcp_spawn, mcp_send, mcp_kill])
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+            // Register system tray menu items
+            let tray_menu = tauri::menu::Menu::with_id(app.handle(), "tray")?;
+            let show = tauri::menu::MenuItem::with_id(
+                app.handle(),
+                "show",
+                "Show VEGA",
+                true,
+                None::<&str>,
+            )?;
+            let quit =
+                tauri::menu::MenuItem::with_id(app.handle(), "quit", "Quit", true, None::<&str>)?;
+            tray_menu.append(&show)?;
+            tray_menu.append(&quit)?;
+
+            let _tray = tauri::tray::TrayIconBuilder::with_id("main_tray")
+                .menu(&tray_menu)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show" => {
+                        if let Some(webview) = app.get_webview_window("main") {
+                            let _ = webview.show();
+                            let _ = webview.set_focus();
+                        }
+                    }
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    _ => {}
+                })
+                .build(app)?;
+
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![mcp_spawn, mcp_send, mcp_kill])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }
 
 use std::collections::HashMap;
-use std::process::{Child, Command as StdCommand, Stdio};
 use std::io::{BufRead, BufReader, Write};
+use std::process::{Child, Command as StdCommand, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -59,7 +69,13 @@ lazy_static::lazy_static! {
 }
 
 #[tauri::command]
-async fn mcp_spawn(app: tauri::AppHandle, name: String, cmd: String, args: Vec<String>, env: HashMap<String, String>) -> Result<(), String> {
+async fn mcp_spawn(
+    app: tauri::AppHandle,
+    name: String,
+    cmd: String,
+    args: Vec<String>,
+    env: HashMap<String, String>,
+) -> Result<(), String> {
     mcp_kill(name.clone()).await?;
 
     let mut process_cmd = StdCommand::new(&cmd);
@@ -72,7 +88,9 @@ async fn mcp_spawn(app: tauri::AppHandle, name: String, cmd: String, args: Vec<S
         process_cmd.env(k, v);
     }
 
-    let mut child = process_cmd.spawn().map_err(|e| format!("Failed to spawn {}: {}", cmd, e))?;
+    let mut child = process_cmd
+        .spawn()
+        .map_err(|e| format!("Failed to spawn {}: {}", cmd, e))?;
     let stdout = child.stdout.take().ok_or("Failed to open stdout")?;
     let stderr = child.stderr.take().ok_or("Failed to open stderr")?;
 
@@ -119,7 +137,9 @@ async fn mcp_send(name: String, message: String) -> Result<(), String> {
         if let Some(stdin) = child.stdin.as_mut() {
             writeln!(stdin, "{}", message)
                 .map_err(|e| format!("Failed to write to stdin: {}", e))?;
-            stdin.flush().map_err(|e| format!("Failed to flush stdin: {}", e))?;
+            stdin
+                .flush()
+                .map_err(|e| format!("Failed to flush stdin: {}", e))?;
             Ok(())
         } else {
             Err("No stdin pipe available".to_string())
@@ -138,4 +158,3 @@ async fn mcp_kill(name: String) -> Result<(), String> {
     }
     Ok(())
 }
-

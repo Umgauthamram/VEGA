@@ -28,6 +28,7 @@
     "fs:default",
     "fs:read-all",
     "fs:write-all",
-    "dialog:default"
+    "dialog:default",
+    "http:default"
   ]
 }

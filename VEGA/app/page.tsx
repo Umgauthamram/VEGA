@@ -179,6 +179,17 @@ export default function Home() {
   // Load database items on mount
   useEffect(() => {
     (async () => {
+      // Patch global fetch with Tauri plugin fetch to bypass WebView CORS restrictions
+      if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+        try {
+          const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+          window.fetch = tauriFetch as any;
+          console.log('Successfully patched global fetch with Tauri HTTP plugin fetch.');
+        } catch (e) {
+          console.error('Failed to patch global fetch with tauri fetch:', e);
+        }
+      }
+
       const convs = await loadConversations();
       setConversations(convs);
       if (convs.length > 0) {
