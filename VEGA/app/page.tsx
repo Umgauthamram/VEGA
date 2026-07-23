@@ -69,7 +69,7 @@ export default function Home() {
   const [agentMode, setAgentMode] = useState<boolean>(false);
   const [agentLogs, setAgentLogs] = useState<{ step: string; type: 'call' | 'response' | 'error'; timestamp: number }[]>([]);
   const [showLogsPanel, setShowLogsPanel] = useState<boolean>(false);
-  const [workspaceDir, setWorkspaceDir] = useState<string>('G:\\projects\\laude\\workspace');
+  const [workspaceDir, setWorkspaceDir] = useState<string>('G:\\projects\\VEGA\\workspace');
   const [safetyLevel, setSafetyLevel] = useState<'yolo' | 'ask_dangerous' | 'ask_always'>('ask_dangerous');
   const [pendingApproval, setPendingApproval] = useState<{ toolCallId: string; name: string; args: any; onApprove: () => void; onReject: () => void } | null>(null);
 

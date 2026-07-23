@@ -47,10 +47,6 @@ export function ChatView({
         <div className="flex items-center gap-3">
           <button className="p-1.5 hover:bg-sidebar rounded text-foreground/60 transition" title="Toggle Sidebar">☰</button>
           <button className="p-1.5 hover:bg-sidebar rounded text-foreground/60 transition" title="Search">🔍</button>
-          <div className="flex items-center gap-1">
-            <button className="p-1 hover:bg-sidebar rounded text-foreground/60 transition">←</button>
-            <button className="p-1 hover:bg-sidebar rounded text-foreground/60 transition">→</button>
-          </div>
           <span className="font-serif font-bold text-sm truncate ml-2">{activeConvTitle || 'New Conversation'}</span>
         </div>
         <div className="flex items-center gap-3">
