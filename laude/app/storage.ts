@@ -5,6 +5,9 @@ let dbInstance: Database | null = null;
 
 export async function getDb(): Promise<Database | null> {
   if (typeof window === 'undefined') return null;
+  const isTauri = (window as any).__TAURI_INTERNALS__ !== undefined;
+  if (!isTauri) return null;
+
   if (!dbInstance) {
     try {
       dbInstance = await Database.load('sqlite:laude.db');
