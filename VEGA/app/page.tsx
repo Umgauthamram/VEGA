@@ -44,6 +44,7 @@ export default function Home() {
   const [input, setInput] = useState<string>('');
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const skipMessageLoadRef = useRef<boolean>(false);
 
   // Attachments
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -224,6 +225,10 @@ export default function Home() {
 
   // Load messages when active conversation changes
   useEffect(() => {
+    if (skipMessageLoadRef.current) {
+      skipMessageLoadRef.current = false;
+      return;
+    }
     if (activeConvId) {
       loadMessages(activeConvId).then(setMessages);
     } else {
@@ -663,6 +668,7 @@ export default function Home() {
       };
       await saveConversation(newConv);
       setConversations((prev) => [newConv, ...prev]);
+      skipMessageLoadRef.current = true;
       setActiveConvId(newConv.id);
       currentConvId = newConv.id;
       activeConv = newConv;
