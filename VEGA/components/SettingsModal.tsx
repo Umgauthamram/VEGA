@@ -76,7 +76,7 @@ interface SettingsModalProps {
   setNewMcpArgs: (val: string) => void;
 }
 
-type Tab = 'general' | 'providers' | 'capabilities' | 'agent' | 'connectors';
+type Tab = 'general' | 'providers' | 'capabilities' | 'agent' | 'connectors' | 'plugins' | 'skills';
 
 export function SettingsModal({
   showSettings,
@@ -243,10 +243,22 @@ export function SettingsModal({
             <div className="space-y-1">
               <div className="text-[10px] font-bold text-foreground/40 uppercase tracking-wider px-2">Customize</div>
               <button 
+                onClick={() => setActiveTab('plugins')}
+                className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${activeTab === 'plugins' ? 'bg-background text-foreground shadow-xs' : 'text-foreground/70 hover:bg-background/40'}`}
+              >
+                Plugins
+              </button>
+              <button 
+                onClick={() => setActiveTab('skills')}
+                className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${activeTab === 'skills' ? 'bg-background text-foreground shadow-xs' : 'text-foreground/70 hover:bg-background/40'}`}
+              >
+                Skills
+              </button>
+              <button 
                 onClick={() => setActiveTab('connectors')}
                 className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${activeTab === 'connectors' ? 'bg-background text-foreground shadow-xs' : 'text-foreground/70 hover:bg-background/40'}`}
               >
-                MCP Connectors
+                Connectors
               </button>
             </div>
           </div>
@@ -579,124 +591,86 @@ export function SettingsModal({
               </div>
             )}
 
-            {/* MCP CONNECTORS TAB */}
+            {/* PLUGINS TAB */}
+            {activeTab === 'plugins' && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center border-b border-border-color/30 pb-3">
+                  <div>
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-foreground/50">Plugins System</h3>
+                    <p className="text-xs text-foreground/45 mt-1">Modular extensions to scale VEGA's native user experience and tool bindings.</p>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider bg-rose-500/15 text-rose-500 px-2 py-0.5 rounded">Disabled</span>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="bg-sidebar border border-border-color rounded-xl p-4 text-xs space-y-2">
+                    <h4 className="font-bold text-foreground">Features include:</h4>
+                    <ul className="list-disc list-inside space-y-1.5 text-foreground/70">
+                      <li><strong>Theme Customizers:</strong> Tailor custom color palettes, borders, typography, and dark mode dynamics.</li>
+                      <li><strong>Third-party API Bindings:</strong> Synchronize with Slack, Google Drive, Notion, and Jira.</li>
+                      <li><strong>Workspace Analytics:</strong> View model usage, token charts, performance breakdowns, and database metrics.</li>
+                    </ul>
+                  </div>
+
+                  <div className="text-center p-8 bg-card-bg border border-dashed border-border-color rounded-xl text-xs text-foreground/45 italic">
+                    Plugin registration is currently locked. Still under development.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SKILLS TAB */}
+            {activeTab === 'skills' && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center border-b border-border-color/30 pb-3">
+                  <div>
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-foreground/50">Preconfigured Agent Skills</h3>
+                    <p className="text-xs text-foreground/45 mt-1">Ready-to-use function schemas and executable scripting layers for the ReAct loop.</p>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider bg-rose-500/15 text-rose-500 px-2 py-0.5 rounded">Disabled</span>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="bg-sidebar border border-border-color rounded-xl p-4 text-xs space-y-2">
+                    <h4 className="font-bold text-foreground">Features include:</h4>
+                    <ul className="list-disc list-inside space-y-1.5 text-foreground/70">
+                      <li><strong>Local File System Utils:</strong> Perform complex edits, listing, and file structure analysis with LLMs.</li>
+                      <li><strong>Web Scrapers & Search:</strong> Fetch search results and parse target pages directly inside chat contexts.</li>
+                      <li><strong>Command Line Tools:</strong> Run shell scripts, compiler diagnostics, and build chains autonomously.</li>
+                    </ul>
+                  </div>
+
+                  <div className="text-center p-8 bg-card-bg border border-dashed border-border-color rounded-xl text-xs text-foreground/45 italic">
+                    Agent skills engine is locked. Still under development.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* CONNECTORS TAB */}
             {activeTab === 'connectors' && (
               <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-foreground/50">MCP Configured Connectors</h3>
-                  <button 
-                    onClick={handleImportClaudeConfig}
-                    className="text-[10px] text-accent hover:underline font-bold uppercase tracking-wider"
-                  >
-                    Import from Claude Desktop
-                  </button>
-                </div>
-
-                <div className="space-y-3 max-h-60 overflow-y-auto">
-                  {mcpServers.length === 0 ? (
-                    <div className="text-xs text-foreground/45 italic p-4 bg-sidebar rounded-xl border border-border-color/50 text-center">
-                      No MCP connectors active. Configure a connector server below.
-                    </div>
-                  ) : (
-                    mcpServers.map((srv) => (
-                      <div key={srv.name} className="bg-sidebar border border-border-color rounded-xl p-3 text-xs space-y-2 relative">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-foreground">{srv.name}</span>
-                              <span className={`w-2 h-2 rounded-full ${
-                                getMcpStatus(srv.name) === 'connected' ? 'bg-emerald-500' :
-                                getMcpStatus(srv.name) === 'connecting' ? 'bg-amber-500 animate-pulse' :
-                                getMcpStatus(srv.name) === 'disabled' ? 'bg-foreground/20' : 'bg-rose-500'
-                              }`} />
-                              <span className="text-[9px] text-foreground/45 uppercase font-semibold">
-                                {srv.type === 'http' ? 'HTTP/SSE' : 'STDIO'} • {getMcpToolsCount(srv.name)} tools
-                              </span>
-                            </div>
-                            <div className="text-[10px] text-foreground/50 font-mono mt-1 break-all">
-                              {srv.type === 'http' ? srv.url : `${srv.command} ${srv.args?.join(' ') || ''}`}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1.5">
-                            <button 
-                              onClick={() => {
-                                const active = !srv.enabled;
-                                srv.enabled = active;
-                                saveMcpServer(srv);
-                                setMcpServers([...mcpServers]);
-                                if (active) connectMcpServer(srv).catch(() => {});
-                                else disconnectMcpServer(srv.name);
-                              }}
-                              className={`p-1 rounded text-[10px] font-bold uppercase ${srv.enabled ? 'text-rose-500 hover:bg-rose-950/20' : 'text-emerald-500 hover:bg-emerald-950/20'}`}
-                            >
-                              {srv.enabled ? <Power className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                            </button>
-                            <button 
-                              onClick={() => {
-                                deleteMcpServer(srv.name);
-                                setMcpServers(mcpServers.filter(s => s.name !== srv.name));
-                              }}
-                              className="text-foreground/40 hover:text-rose-500 p-1"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <div className="border-t border-border-color/50 pt-4 space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/50">Add MCP Server Connector</h3>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <input
-                      type="text"
-                      value={newMcpName}
-                      onChange={(e) => setNewMcpName(e.target.value)}
-                      placeholder="Server Name (e.g. filesystem)"
-                      className="bg-background border border-border-color rounded p-2 text-xs text-foreground outline-none focus:border-accent"
-                    />
-                    <select
-                      value={newMcpType}
-                      onChange={(e) => setNewMcpType(e.target.value as any)}
-                      className="bg-sidebar border border-border-color rounded p-2 text-xs text-foreground outline-none"
-                    >
-                      <option value="stdio">stdio transport</option>
-                      <option value="http">http/sse transport</option>
-                    </select>
-
-                    {newMcpType === 'stdio' ? (
-                      <>
-                        <input
-                          type="text"
-                          value={newMcpCommand}
-                          onChange={(e) => setNewMcpCommand(e.target.value)}
-                          placeholder="Command path (e.g. node, npx)"
-                          className="bg-background border border-border-color rounded p-2 text-xs text-foreground outline-none focus:border-accent col-span-2"
-                        />
-                        <input
-                          type="text"
-                          value={newMcpArgs}
-                          onChange={(e) => setNewMcpArgs(e.target.value)}
-                          placeholder="Arguments (comma-separated, e.g. -y, @modelcontextprotocol/server-filesystem)"
-                          className="bg-background border border-border-color rounded p-2 text-xs text-foreground outline-none focus:border-accent col-span-2"
-                        />
-                      </>
-                    ) : (
-                      <input
-                        type="text"
-                        value={newMcpUrl}
-                        onChange={(e) => setNewMcpUrl(e.target.value)}
-                        placeholder="SSE Endpoint URL (e.g. http://localhost:3001)"
-                        className="bg-background border border-border-color rounded p-2 text-xs text-foreground outline-none focus:border-accent col-span-2"
-                      />
-                    )}
+                <div className="flex justify-between items-center border-b border-border-color/30 pb-3">
+                  <div>
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-foreground/50">MCP Connectors</h3>
+                    <p className="text-xs text-foreground/45 mt-1">Connect stdio or http/sse Model Context Protocol servers to dynamically expose host tools.</p>
                   </div>
-                  <button onClick={handleAddMcpConnector} className="bg-accent hover:bg-accent-hover text-white text-xs font-bold px-4 py-2 rounded-lg transition flex items-center gap-1">
-                    <Plus className="w-3.5 h-3.5" /> Save Connector
-                  </button>
+                  <span className="text-[10px] font-bold uppercase tracking-wider bg-rose-500/15 text-rose-500 px-2 py-0.5 rounded">Disabled</span>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="bg-sidebar border border-border-color rounded-xl p-4 text-xs space-y-2">
+                    <h4 className="font-bold text-foreground">Features include:</h4>
+                    <ul className="list-disc list-inside space-y-1.5 text-foreground/70">
+                      <li><strong>Stdio Transport Bridge:</strong> Spawns node/python subprocesses to load filesystem, sqlite, and git tools.</li>
+                      <li><strong>SSE Transport Bridge:</strong> Interface with remote HTTP servers hosting specialized endpoints.</li>
+                      <li><strong>Automatic Tool Injection:</strong> Automatically imports and binds tools to the current conversation session.</li>
+                    </ul>
+                  </div>
+
+                  <div className="text-center p-8 bg-card-bg border border-dashed border-border-color rounded-xl text-xs text-foreground/45 italic">
+                    MCP Connector registry is locked. Still under development.
+                  </div>
                 </div>
               </div>
             )}
