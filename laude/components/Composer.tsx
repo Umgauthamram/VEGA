@@ -92,107 +92,87 @@ export function Composer({
 
         <div className="flex justify-between items-center mt-2 pt-2 border-t border-border-color/30">
           <div className="flex items-center gap-2">
-            <button onClick={() => fileInputRef.current?.click()} className="p-2 text-foreground/50 hover:text-foreground/80 transition" title="Add File / Image Attachment">
-              <Paperclip className="w-4 h-4" />
+            {/* File context attachment + */}
+            <button 
+              onClick={() => fileInputRef.current?.click()} 
+              className="p-1.5 bg-sidebar hover:bg-background border border-border-color rounded-xl text-foreground/60 transition" 
+              title="Add File / Context"
+            >
+              +
             </button>
             <input type="file" ref={fileInputRef} onChange={handleFileChange} multiple className="hidden" />
 
-            {/* Project Picker Folder Icon */}
-            <div className="relative">
+            {/* Mode Segmented Toggle: Chat vs Cowork */}
+            <div className="flex items-center bg-sidebar border border-border-color rounded-xl p-0.5 text-[11px] font-bold uppercase tracking-wider">
               <button 
-                onClick={() => setShowProjectPicker(!showProjectPicker)} 
-                className={`p-2 transition rounded ${activeProjectId ? 'text-accent' : 'text-foreground/50 hover:text-foreground/80'}`}
-                title="Link Project (Local RAG)"
+                onClick={() => {
+                  setAgentMode(false);
+                }}
+                className={`px-2.5 py-1 rounded-lg transition ${!agentMode ? 'bg-card-bg text-foreground' : 'text-foreground/50'}`}
               >
-                <Folder className="w-4 h-4" />
+                Chat
               </button>
-              {showProjectPicker && (
-                <div className="absolute bottom-10 left-0 bg-card-bg border border-border-color rounded-xl shadow-lg p-2.5 z-40 w-56 text-xs text-foreground space-y-1">
-                  <div className="font-bold text-foreground/50 text-[9px] uppercase px-2 mb-1">Link Workspace Project</div>
-                  <button 
-                    onClick={() => { setActiveProjectId(null); setShowProjectPicker(false); }}
-                    className={`w-full text-left px-2 py-1.5 rounded transition ${!activeProjectId ? 'bg-sidebar font-semibold' : 'hover:bg-sidebar/55'}`}
-                  >
-                    None (General Chat)
-                  </button>
-                  {projects.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => { setActiveProjectId(p.id); setShowProjectPicker(false); }}
-                      className={`w-full text-left px-2 py-1.5 rounded transition ${activeProjectId === p.id ? 'bg-sidebar font-semibold' : 'hover:bg-sidebar/55'}`}
-                    >
-                      {p.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Mode Select Chip */}
-            <select
-              value={agentMode ? 'agent' : 'chat'}
-              onChange={(e) => {
-                const isAgent = e.target.value === 'agent';
-                setAgentMode(isAgent);
-                if (isAgent) {
+              <button 
+                onClick={() => {
+                  setAgentMode(true);
                   const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ !== undefined;
                   if (!isTauri) {
                     setShowBrowserWarning(true);
                   }
-                }
-              }}
-              className="bg-transparent border border-border-color text-foreground/80 text-xs rounded-lg px-2 py-1 focus:outline-none"
+                }}
+                className={`px-2.5 py-1 rounded-lg transition ${agentMode ? 'bg-card-bg text-foreground' : 'text-foreground/50'}`}
+              >
+                Cowork
+              </button>
+            </div>
+
+            {/* Model select chip */}
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="bg-sidebar border border-border-color text-foreground/80 text-[11px] font-bold uppercase tracking-wider rounded-xl px-2.5 py-1 outline-none transition"
             >
-              <option value="chat">Manual Chat</option>
-              <option value="agent">Autonomous Agent</option>
+              {models.length === 0 ? (
+                <option value="">No local models found</option>
+              ) : (
+                models.map((m) => (
+                  <option key={m.name} value={m.name}>
+                    {m.name}
+                  </option>
+                ))
+              )}
             </select>
+
+            {/* Parameter slider dropdown button */}
+            <button 
+              onClick={() => setShowPresetDropdown(!showPresetDropdown)}
+              className="p-1.5 bg-sidebar border border-border-color rounded-xl text-foreground/50 hover:text-foreground/80 transition"
+              title="Preset Parameters"
+            >
+              <Sliders className="w-3.5 h-3.5" />
+            </button>
+
+            {showPresetDropdown && (
+              <div className="absolute bottom-12 left-2 bg-card-bg border border-border-color rounded-xl shadow-lg p-2.5 z-40 w-56 text-xs text-foreground space-y-1">
+                <div className="font-bold text-foreground/50 text-[9px] uppercase px-2 mb-1">Preset configurations</div>
+                {presets.map((pr) => (
+                  <button
+                    key={pr.id}
+                    onClick={() => { setActivePreset(pr); setShowPresetDropdown(false); }}
+                    className={`w-full text-left px-2 py-1.5 rounded transition ${activePreset.id === pr.id ? 'bg-sidebar font-semibold' : 'hover:bg-sidebar/50'}`}
+                  >
+                    {pr.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Model select chip */}
-            <div className="flex flex-col items-end">
-              <select
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                className="bg-transparent border border-border-color text-foreground/80 text-xs rounded-lg px-2.5 py-1 outline-none text-right font-medium"
-              >
-                {models.length === 0 ? (
-                  <option value="">No local models found</option>
-                ) : (
-                  models.map((m) => (
-                    <option key={m.name} value={m.name}>
-                      {m.name}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-
-            {/* Parameters Settings Preset selector */}
-            <div className="relative">
-              <button 
-                onClick={() => setShowPresetDropdown(!showPresetDropdown)}
-                className="p-1 border border-border-color rounded-lg text-foreground/50 hover:text-foreground/80 transition"
-              >
-                <Sliders className="w-3.5 h-3.5" />
-              </button>
-              {showPresetDropdown && (
-                <div className="absolute bottom-10 right-0 bg-card-bg border border-border-color rounded-xl shadow-lg p-3 z-40 w-64 text-xs text-foreground space-y-2">
-                  <div className="font-bold text-foreground/50 text-[9px] uppercase">preset configurations</div>
-                  <div className="space-y-1">
-                    {presets.map((pr) => (
-                      <button
-                        key={pr.id}
-                        onClick={() => { setActivePreset(pr); setShowPresetDropdown(false); }}
-                        className={`w-full text-left px-2 py-1.5 rounded transition ${activePreset.id === pr.id ? 'bg-sidebar font-semibold' : 'hover:bg-sidebar/50'}`}
-                      >
-                        {pr.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* Dictate Microphone Placeholder */}
+            <button className="p-1.5 text-foreground/40 cursor-not-allowed" title="Voice Input (Disabled)" disabled>
+              🎙️
+            </button>
 
             {isStreaming ? (
               <button onClick={handleStopStream} className="p-2 bg-rose-600 hover:bg-rose-500 text-white rounded-full transition shadow-xs">
@@ -208,6 +188,47 @@ export function Composer({
               </button>
             )}
           </div>
+        </div>
+
+        {/* Context Tray (Bottom row inside the composer card) */}
+        <div className="flex items-center gap-2.5 mt-2 pt-2 border-t border-border-color/20 text-[10px] font-bold text-foreground/50 uppercase tracking-wider">
+          <div className="relative">
+            <button 
+              onClick={() => setShowProjectPicker(!showProjectPicker)} 
+              className="flex items-center gap-1 hover:text-foreground transition"
+            >
+              📁 {activeProjectId ? projects.find(p => p.id === activeProjectId)?.name : 'Link Workspace'} ▾
+            </button>
+            {showProjectPicker && (
+              <div className="absolute bottom-6 left-0 bg-card-bg border border-border-color rounded-xl shadow-lg p-2 z-40 w-56 text-xs text-foreground space-y-1">
+                <button 
+                  onClick={() => { setActiveProjectId(null); setShowProjectPicker(false); }}
+                  className={`w-full text-left px-2 py-1.5 rounded transition ${!activeProjectId ? 'bg-sidebar font-semibold' : 'hover:bg-sidebar/55'}`}
+                >
+                  None (General Chat)
+                </button>
+                {projects.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => { setActiveProjectId(p.id); setShowProjectPicker(false); }}
+                    className={`w-full text-left px-2 py-1.5 rounded transition ${activeProjectId === p.id ? 'bg-sidebar font-semibold' : 'hover:bg-sidebar/55'}`}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <span className="text-border-color/60">|</span>
+
+          {/* Execution Control Selector */}
+          <span className="cursor-pointer hover:text-foreground transition">🖐️ Manual ▾</span>
+
+          <span className="text-border-color/60 ml-auto">|</span>
+
+          {/* Usage Meter Indicator */}
+          <span className="text-accent">⚡ 2x usage allowance active</span>
         </div>
       </div>
 

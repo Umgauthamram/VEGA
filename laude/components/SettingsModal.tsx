@@ -114,36 +114,79 @@ export function SettingsModal({
       <div className="bg-card-bg border border-border-color rounded-xl w-full max-w-3xl h-[640px] flex overflow-hidden shadow-2xl">
         {/* Left Side Navigation Panel */}
         <div className="w-56 bg-sidebar border-r border-border-color flex flex-col p-4 space-y-4">
-          <div className="text-xs font-bold text-foreground/40 uppercase tracking-wider px-2">Settings</div>
-          <div className="space-y-0.5 flex-1">
-            <button
-              onClick={() => setActiveTab('general')}
-              className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${activeTab === 'general' ? 'bg-background font-semibold' : 'hover:bg-background/40'}`}
-            >
-              General & Profile
-            </button>
-            <button
-              onClick={() => setActiveTab('providers')}
-              className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${activeTab === 'providers' ? 'bg-background font-semibold' : 'hover:bg-background/40'}`}
-            >
-              LLM Providers
-            </button>
-            <button
-              onClick={() => setActiveTab('capabilities')}
-              className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${activeTab === 'capabilities' ? 'bg-background font-semibold' : 'hover:bg-background/40'}`}
-            >
-              Models & Capabilities
-            </button>
-            <button
-              onClick={() => setActiveTab('agent')}
-              className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${activeTab === 'agent' ? 'bg-background font-semibold' : 'hover:bg-background/40'}`}
-            >
-              Agent Configuration
-            </button>
+          <input 
+            type="text" 
+            placeholder="🔍 Search" 
+            className="w-full bg-background border border-border-color rounded-lg px-2.5 py-1.5 text-xs text-foreground outline-none"
+          />
+          <div className="space-y-4 flex-1 overflow-y-auto">
+            <div className="space-y-1">
+              <div className="text-[10px] font-bold text-foreground/40 uppercase tracking-wider px-2">Settings</div>
+              <button
+                onClick={() => setActiveTab('general')}
+                className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${activeTab === 'general' ? 'bg-background text-foreground' : 'text-foreground/70 hover:bg-background/40'}`}
+              >
+                General & Profile
+              </button>
+              <button
+                onClick={() => setActiveTab('providers')}
+                className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${activeTab === 'providers' ? 'bg-background text-foreground' : 'text-foreground/70 hover:bg-background/40'}`}
+              >
+                Account / LLM Providers
+              </button>
+              <button
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-foreground/40 cursor-not-allowed"
+                disabled
+              >
+                Usage Analytics
+              </button>
+              <button
+                onClick={() => setActiveTab('capabilities')}
+                className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${activeTab === 'capabilities' ? 'bg-background text-foreground' : 'text-foreground/70 hover:bg-background/40'}`}
+              >
+                Capabilities / Models
+              </button>
+              <button
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-foreground/40 cursor-not-allowed"
+                disabled
+              >
+                Claude Code
+              </button>
+              <button
+                onClick={() => setActiveTab('agent')}
+                className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${activeTab === 'agent' ? 'bg-background text-foreground' : 'text-foreground/70 hover:bg-background/40'}`}
+              >
+                Cowork Agent
+              </button>
+            </div>
+
+            <div className="space-y-1">
+              <div className="text-[10px] font-bold text-foreground/40 uppercase tracking-wider px-2">Desktop App</div>
+              <button className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-foreground/70 hover:bg-background/40">General App Settings</button>
+              <button className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-foreground/70 hover:bg-background/40">Extensions</button>
+              <button className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-foreground/70 hover:bg-background/40">Developer Modes</button>
+            </div>
+
+            <div className="space-y-1">
+              <div className="text-[10px] font-bold text-foreground/40 uppercase tracking-wider px-2">Customize</div>
+              <button 
+                onClick={() => setActiveTab('general')}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-foreground/70 hover:bg-background/40"
+              >
+                Skills Management
+              </button>
+              <button className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-foreground/70 hover:bg-background/40">MCP Connectors</button>
+              <button className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-foreground/70 hover:bg-background/40">Plugins</button>
+            </div>
           </div>
+
+          <div className="pt-2 border-t border-border-color/30">
+            <span className="text-[10px] text-accent hover:underline cursor-pointer font-bold uppercase tracking-wider block px-2">Organization ↗</span>
+          </div>
+
           <button 
             onClick={() => setShowSettings(false)} 
-            className="w-full text-center py-2 border border-border-color hover:bg-background/50 rounded-lg text-xs font-semibold transition"
+            className="w-full text-center py-2 border border-border-color hover:bg-background/50 rounded-lg text-xs font-bold transition"
           >
             Close Settings
           </button>
@@ -156,12 +199,42 @@ export function SettingsModal({
             {/* GENERAL TAB */}
             {activeTab === 'general' && (
               <div className="space-y-6">
-                <div>
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-foreground/50 mb-2">Instructions for Laude (User Memory)</h3>
+                {/* Profile Section */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/50">Profile Details</h3>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center text-white font-bold text-lg font-serif">
+                      CS
+                    </div>
+                    <div className="flex-1 grid grid-cols-2 gap-2 text-xs">
+                      <div className="space-y-1">
+                        <span className="font-semibold text-foreground/70">Full Name</span>
+                        <input type="text" defaultValue="Claude Senior" className="w-full bg-background border border-border-color rounded-lg px-2.5 py-1.5 text-xs text-foreground outline-none" />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="font-semibold text-foreground/70">Call Name</span>
+                        <input type="text" defaultValue="Claude" className="w-full bg-background border border-border-color rounded-lg px-2.5 py-1.5 text-xs text-foreground outline-none" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 text-xs">
+                    <span className="font-semibold text-foreground/70">Role Designation</span>
+                    <select className="w-full bg-background border border-border-color rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none">
+                      <option>Product Designer</option>
+                      <option>Software Engineer</option>
+                      <option>Data Scientist</option>
+                      <option>Other Professional</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="border-t border-border-color/50 pt-4">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/50 mb-2">Instructions for Laude (User Memory)</h3>
                   <textarea
                     value={userMemoryText}
                     onChange={(e) => setUserMemoryText(e.target.value)}
-                    rows={4}
+                    rows={3}
                     placeholder="Provide developer details, instructions, preferred languages, coding styles, etc..."
                     className="w-full bg-background border border-border-color rounded-lg p-2.5 text-xs outline-none focus:border-accent text-foreground resize-none"
                   />
@@ -171,9 +244,9 @@ export function SettingsModal({
                 </div>
 
                 <div className="border-t border-border-color/50 pt-4 space-y-4">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-foreground/50">Preferences</h3>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/50">Preferences</h3>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium">Appearance Theme</span>
+                    <span className="font-semibold">Appearance Theme</span>
                     <div className="flex items-center bg-sidebar border border-border-color rounded-lg p-0.5">
                       <button 
                         onClick={() => setTheme('light')} 
@@ -197,7 +270,7 @@ export function SettingsModal({
                   </div>
 
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium">Chat Font Style</span>
+                    <span className="font-semibold">Chat Font Style</span>
                     <select
                       value={useSerifFont ? 'serif' : 'sans'}
                       onChange={(e) => {
@@ -215,7 +288,7 @@ export function SettingsModal({
                       className="bg-sidebar border border-border-color text-xs rounded-lg p-1.5 text-foreground"
                     >
                       <option value="sans">System Default (Sans)</option>
-                      <option value="serif">Claude Serif Style</option>
+                      <option value="serif">Anthropic Serif style</option>
                     </select>
                   </div>
                 </div>
