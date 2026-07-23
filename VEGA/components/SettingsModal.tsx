@@ -251,9 +251,7 @@ export function SettingsModal({
             </div>
           </div>
 
-          <div className="pt-2 border-t border-border-color/30">
-            <span className="text-[10px] text-accent hover:underline cursor-pointer font-bold uppercase tracking-wider block px-2">Organization ↗</span>
-          </div>
+
 
           <button 
             onClick={() => setShowSettings(false)} 

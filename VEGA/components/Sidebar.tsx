@@ -348,10 +348,10 @@ export function Sidebar({
         >
           <div className="flex items-center gap-2.5 overflow-hidden">
             <div className="w-7 h-7 rounded bg-accent flex items-center justify-center text-white font-bold text-xs shrink-0 font-serif">
-              D
+              V
             </div>
             <div className="overflow-hidden">
-              <div className="text-xs font-semibold truncate text-foreground">Digital South Trust</div>
+              <div className="text-xs font-semibold truncate text-foreground">VEGA user</div>
               <div className="text-[10px] text-foreground/50 flex items-center gap-1.5">
                 <span className={`w-2 h-2 rounded-full ${
                   isConnected === null ? 'bg-amber-500 animate-pulse' : isConnected ? 'bg-emerald-500' : 'bg-rose-500'
@@ -391,15 +391,17 @@ export function Sidebar({
 
             <div className="border-t border-border-color/50 pt-2 grid grid-cols-2 gap-1">
               <button 
-                onClick={() => { setShowAccountPopover(false); handleBackupExport(); }}
-                className="flex items-center justify-center gap-1.5 py-1 rounded hover:bg-sidebar transition text-[10px] font-bold text-foreground/70"
+                disabled
+                className="flex items-center justify-center gap-1.5 py-1 rounded transition text-[10px] font-bold text-foreground/35 cursor-not-allowed opacity-50"
               >
                 <Database className="w-3 h-3" /> Export
               </button>
-              <label className="flex items-center justify-center gap-1.5 py-1 rounded hover:bg-sidebar transition text-[10px] font-bold text-foreground/70 cursor-pointer">
+              <button 
+                disabled
+                className="flex items-center justify-center gap-1.5 py-1 rounded transition text-[10px] font-bold text-foreground/35 cursor-not-allowed opacity-50"
+              >
                 <Upload className="w-3 h-3" /> Import
-                <input type="file" onChange={(e) => { setShowAccountPopover(false); handleBackupImport(e); }} accept=".json" className="hidden" />
-              </label>
+              </button>
             </div>
             
             <div className="text-[9px] text-foreground/45 px-2 pt-1 border-t border-border-color/20 text-center font-mono">
