@@ -58,10 +58,10 @@ interface SettingsModalProps {
   handleBackupExport: () => void;
   handleBackupImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   // Profile settings
-  userName: string;
-  setUserName: (val: string) => void;
-  userCallName: string;
-  setUserCallName: (val: string) => void;
+  userFirstName: string;
+  setUserFirstName: (val: string) => void;
+  userLastName: string;
+  setUserLastName: (val: string) => void;
   // Stats details
   conversationsCount: number;
   totalGeneratedTokens: number;
@@ -121,10 +121,10 @@ export function SettingsModal({
   setActivePreset,
   handleBackupExport,
   handleBackupImport,
-  userName,
-  setUserName,
-  userCallName,
-  setUserCallName,
+  userFirstName,
+  setUserFirstName,
+  userLastName,
+  setUserLastName,
   conversationsCount,
   totalGeneratedTokens,
   mcpServers,
@@ -273,24 +273,24 @@ export function SettingsModal({
                   <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/50">Profile Details</h3>
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center text-white font-bold text-lg font-serif">
-                      {userCallName.slice(0, 2).toUpperCase() || 'U'}
+                      {((userFirstName[0] || '') + (userLastName[0] || '')).toUpperCase() || 'U'}
                     </div>
                     <div className="flex-1 grid grid-cols-2 gap-2 text-xs">
                       <div className="space-y-1">
-                        <span className="font-semibold text-foreground/70">Full Name</span>
+                        <span className="font-semibold text-foreground/70">First Name</span>
                         <input 
                           type="text" 
-                          value={userName} 
-                          onChange={(e) => setUserName(e.target.value)}
+                          value={userFirstName} 
+                          onChange={(e) => setUserFirstName(e.target.value)}
                           className="w-full bg-background border border-border-color rounded-lg px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-accent/40" 
                         />
                       </div>
                       <div className="space-y-1">
-                        <span className="font-semibold text-foreground/70">Call Name</span>
+                        <span className="font-semibold text-foreground/70">Last Name</span>
                         <input 
                           type="text" 
-                          value={userCallName} 
-                          onChange={(e) => setUserCallName(e.target.value)}
+                          value={userLastName} 
+                          onChange={(e) => setUserLastName(e.target.value)}
                           className="w-full bg-background border border-border-color rounded-lg px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-accent/40" 
                         />
                       </div>

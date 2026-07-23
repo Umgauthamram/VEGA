@@ -62,8 +62,8 @@ export default function Home() {
 
   // Memory
   const [userMemoryText, setUserMemoryText] = useState<string>('');
-  const [userName, setUserName] = useState<string>('User');
-  const [userCallName, setUserCallName] = useState<string>('Developer');
+  const [userFirstName, setUserFirstName] = useState<string>('VEGA');
+  const [userLastName, setUserLastName] = useState<string>('user');
 
   // Agent Mode config
   const [agentMode, setAgentMode] = useState<boolean>(false);
@@ -98,6 +98,7 @@ export default function Home() {
     cancelText?: string;
     isDestructive?: boolean;
     iconType?: 'danger' | 'warning' | 'info' | 'shield';
+    hideCancel?: boolean;
     resolve?: (val: { ok: boolean; checked: boolean }) => void;
   }>({
     isOpen: false,
@@ -119,6 +120,7 @@ export default function Home() {
           cancelText: options.cancelText,
           isDestructive: options.isDestructive,
           iconType: options.iconType,
+          hideCancel: options.hideCancel,
           resolve
         });
       });
@@ -375,8 +377,9 @@ export default function Home() {
     await triggerConfirmDialog({
       title: 'Memory Saved',
       description: 'User Memory instructions have been updated successfully.',
-      confirmText: 'Dismiss',
-      iconType: 'info'
+      confirmText: 'Close',
+      iconType: 'info',
+      hideCancel: true
     });
   }
 
@@ -447,15 +450,17 @@ export default function Home() {
         await triggerConfirmDialog({
           title: 'Import Success',
           description: 'Backup payload has been fully applied to your active database.',
-          confirmText: 'Dismiss',
-          iconType: 'info'
+          confirmText: 'Close',
+          iconType: 'info',
+          hideCancel: true
         });
       } catch (err) {
         await triggerConfirmDialog({
           title: 'Import Failure',
           description: 'Invalid backup file structure. Parse aborted.',
-          confirmText: 'Dismiss',
-          iconType: 'danger'
+          confirmText: 'Close',
+          iconType: 'danger',
+          hideCancel: true
         });
       }
     };
@@ -942,6 +947,8 @@ If you have completed your task, reply normally without any JSON block.
         handleRenameChat={handleRenameChat}
         handleBackupExport={handleBackupExport}
         handleBackupImport={handleBackupImport}
+        userFirstName={userFirstName}
+        userLastName={userLastName}
       />
 
       {/* 2. Main content view controller */}
@@ -1083,10 +1090,10 @@ If you have completed your task, reply normally without any JSON block.
         setActivePreset={setActivePreset}
         handleBackupExport={handleBackupExport}
         handleBackupImport={handleBackupImport}
-        userName={userName}
-        setUserName={setUserName}
-        userCallName={userCallName}
-        setUserCallName={setUserCallName}
+        userFirstName={userFirstName}
+        setUserFirstName={setUserFirstName}
+        userLastName={userLastName}
+        setUserLastName={setUserLastName}
         conversationsCount={conversations.length}
         totalGeneratedTokens={1358}
         mcpServers={mcpServers}
@@ -1143,6 +1150,7 @@ If you have completed your task, reply normally without any JSON block.
         cancelText={confirmDialogConfig.cancelText}
         isDestructive={confirmDialogConfig.isDestructive}
         iconType={confirmDialogConfig.iconType}
+        hideCancel={confirmDialogConfig.hideCancel}
         onConfirm={() => {
           if (confirmDialogConfig.resolve) {
             confirmDialogConfig.resolve({ ok: true, checked: !!confirmDialogConfig.checkboxChecked });

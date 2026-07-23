@@ -28,6 +28,8 @@ interface SidebarProps {
   // DB actions
   handleBackupExport: () => void;
   handleBackupImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  userFirstName: string;
+  userLastName: string;
 }
 
 export function Sidebar({
@@ -49,7 +51,9 @@ export function Sidebar({
   setAgentMode,
   setShowLogsPanel,
   handleBackupExport,
-  handleBackupImport
+  handleBackupImport,
+  userFirstName,
+  userLastName,
 }: SidebarProps) {
   const [showAccountPopover, setShowAccountPopover] = useState(false);
   const [sortAlphabetical, setSortAlphabetical] = useState(false);
@@ -348,10 +352,10 @@ export function Sidebar({
         >
           <div className="flex items-center gap-2.5 overflow-hidden">
             <div className="w-7 h-7 rounded bg-accent flex items-center justify-center text-white font-bold text-xs shrink-0 font-serif">
-              V
+              {((userFirstName[0] || '') + (userLastName[0] || '')).toUpperCase() || 'V'}
             </div>
             <div className="overflow-hidden">
-              <div className="text-xs font-semibold truncate text-foreground">VEGA user</div>
+              <div className="text-xs font-semibold truncate text-foreground">{userFirstName} {userLastName}</div>
               <div className="text-[10px] text-foreground/50 flex items-center gap-1.5">
                 <span className={`w-2 h-2 rounded-full ${
                   isConnected === null ? 'bg-amber-500 animate-pulse' : isConnected ? 'bg-emerald-500' : 'bg-rose-500'

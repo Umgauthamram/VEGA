@@ -13,6 +13,7 @@ interface ConfirmDialogProps {
   cancelText?: string;
   isDestructive?: boolean;
   iconType?: 'danger' | 'warning' | 'info' | 'shield';
+  hideCancel?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -32,6 +33,7 @@ export function ConfirmDialog({
   cancelText = 'Cancel',
   isDestructive = false,
   iconType = 'warning',
+  hideCancel = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -82,12 +84,14 @@ export function ConfirmDialog({
         )}
 
         <div className="flex gap-2 justify-end pt-2 border-t border-border-color/10">
-          <button
-            onClick={onCancel}
-            className="px-3.5 py-1.5 border border-border-color hover:bg-sidebar rounded-lg text-xs font-bold transition text-foreground/80"
-          >
-            {cancelText}
-          </button>
+          {!hideCancel && (
+            <button
+              onClick={onCancel}
+              className="px-3.5 py-1.5 border border-border-color hover:bg-sidebar rounded-lg text-xs font-bold transition text-foreground/80"
+            >
+              {cancelText}
+            </button>
+          )}
           <button
             onClick={onConfirm}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition text-white shadow-xs ${
@@ -114,6 +118,7 @@ export let triggerConfirmDialog: (options: {
   cancelText?: string;
   isDestructive?: boolean;
   iconType?: 'danger' | 'warning' | 'info' | 'shield';
+  hideCancel?: boolean;
 }) => Promise<{ ok: boolean; checked: boolean }> = () => Promise.resolve({ ok: false, checked: false });
 
 export function registerConfirmTrigger(triggerFn: typeof triggerConfirmDialog) {

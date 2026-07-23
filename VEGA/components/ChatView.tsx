@@ -69,7 +69,7 @@ export function ChatView({
         <div className="max-w-[46rem] mx-auto space-y-8">
           {messages.length === 0 ? (
             <div className="h-[50vh] flex flex-col items-center justify-center text-center text-foreground/60 gap-4">
-              <span className="text-2xl text-accent">✦</span>
+          
               <h2 className="text-3xl font-serif text-foreground font-semibold italic">
                 {(() => {
                   const hr = new Date().getHours();
