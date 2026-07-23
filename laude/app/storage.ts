@@ -10,7 +10,7 @@ export async function getDb(): Promise<Database | null> {
 
   if (!dbInstance) {
     try {
-      dbInstance = await Database.load('sqlite:laude.db');
+      dbInstance = await Database.load('sqlite:vega.db');
       await initDbSchema(dbInstance);
     } catch (e) {
       console.warn('Tauri SQL plugin not available or failed to load, using in-memory fallback:', e);

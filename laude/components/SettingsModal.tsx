@@ -322,7 +322,7 @@ export function SettingsModal({
                 </div>
 
                 <div className="border-t border-border-color/50 pt-4">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/50 mb-2">Instructions for Laude (User Memory)</h3>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/50 mb-2">Instructions for VEGA (User Memory)</h3>
                   <textarea
                     value={userMemoryText}
                     onChange={(e) => setUserMemoryText(e.target.value)}

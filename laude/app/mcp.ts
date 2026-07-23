@@ -93,13 +93,13 @@ function persistMcpConfigs() {
         data.mcpServers[s.name] = { command: s.command, args: s.args, env: s.env, enabled: s.enabled };
       }
     });
-    localStorage.setItem('laude_mcp_config', JSON.stringify(data));
+    localStorage.setItem('vega_mcp_config', JSON.stringify(data));
   }
 }
 
 export function loadMcpConfigs() {
   if (typeof window !== 'undefined') {
-    const saved = localStorage.getItem('laude_mcp_config');
+    const saved = localStorage.getItem('vega_mcp_config');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -275,7 +275,7 @@ export async function connectMcpServer(server: McpServerConfig): Promise<McpTool
     // Initialize request
     const initResult = await sendRpcRequest(server.name, 'initialize', {
       protocolVersion: '2025-03-26',
-      clientInfo: { name: 'laude', version: '0.1' },
+      clientInfo: { name: 'vega', version: '0.1' },
       capabilities: {}
     });
 

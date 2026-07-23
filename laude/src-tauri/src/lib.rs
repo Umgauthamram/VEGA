@@ -20,7 +20,7 @@ pub fn run() {
 
       // Register system tray menu items
       let tray_menu = tauri::menu::Menu::with_id(app.handle(), "tray")?;
-      let show = tauri::menu::MenuItem::with_id(app.handle(), "show", "Show Laude", true, None::<&str>)?;
+      let show = tauri::menu::MenuItem::with_id(app.handle(), "show", "Show VEGA", true, None::<&str>)?;
       let quit = tauri::menu::MenuItem::with_id(app.handle(), "quit", "Quit", true, None::<&str>)?;
       tray_menu.append(&show)?;
       tray_menu.append(&quit)?;

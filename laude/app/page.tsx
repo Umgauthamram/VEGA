@@ -21,6 +21,7 @@ import { ingestProjectFile, queryRelevantChunks } from './rag';
 import { BUILTIN_TOOLS, executeToolLocally } from './agent';
 import { getMcpServers, saveMcpServer, deleteMcpServer, connectMcpServer, executeMcpTool, getLoadedMcpTools, McpServerConfig } from './mcp';
 import { getSchedules, saveSchedule, deleteSchedule, triggerNotification, SavedSchedule, initScheduler } from './scheduler';
+import { ConfirmDialog, registerConfirmTrigger, triggerConfirmDialog } from '../components/ConfirmDialog';
 
 export default function Home() {
   // Navigation states
@@ -61,8 +62,8 @@ export default function Home() {
 
   // Memory
   const [userMemoryText, setUserMemoryText] = useState<string>('');
-  const [userName, setUserName] = useState<string>('Claude Senior');
-  const [userCallName, setUserCallName] = useState<string>('Claude');
+  const [userName, setUserName] = useState<string>('User');
+  const [userCallName, setUserCallName] = useState<string>('Developer');
 
   // Agent Mode config
   const [agentMode, setAgentMode] = useState<boolean>(false);
@@ -84,6 +85,45 @@ export default function Home() {
   const [newSchedCron, setNewSchedCron] = useState<string>('');
   const [newSchedPrompt, setNewSchedPrompt] = useState<string>('');
   const [newSchedMode, setNewSchedMode] = useState<'chat' | 'agent'>('chat');
+
+  // ConfirmDialog configuration state
+  const [confirmDialogConfig, setConfirmDialogConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    monospaceDetail?: string;
+    checkboxLabel?: string;
+    checkboxChecked?: boolean;
+    confirmText?: string;
+    cancelText?: string;
+    isDestructive?: boolean;
+    iconType?: 'danger' | 'warning' | 'info' | 'shield';
+    resolve?: (val: { ok: boolean; checked: boolean }) => void;
+  }>({
+    isOpen: false,
+    title: '',
+    description: ''
+  });
+
+  useEffect(() => {
+    registerConfirmTrigger((options) => {
+      return new Promise<{ ok: boolean; checked: boolean }>((resolve) => {
+        setConfirmDialogConfig({
+          isOpen: true,
+          title: options.title,
+          description: options.description,
+          monospaceDetail: options.monospaceDetail,
+          checkboxLabel: options.checkboxLabel,
+          checkboxChecked: false,
+          confirmText: options.confirmText,
+          cancelText: options.cancelText,
+          isDestructive: options.isDestructive,
+          iconType: options.iconType,
+          resolve
+        });
+      });
+    });
+  }, []);
 
   // Model parameters / Settings state
   const [showSettings, setShowSettings] = useState<boolean>(false);
@@ -230,10 +270,19 @@ export default function Home() {
 
   async function handleDeleteChat(id: string, e: React.MouseEvent) {
     e.stopPropagation();
-    await deleteConversation(id);
-    setConversations((prev) => prev.filter((c) => c.id !== id));
-    if (activeConvId === id) {
-      setActiveConvId(null);
+    const confirmRes = await triggerConfirmDialog({
+      title: 'Delete Chat',
+      description: 'Are you sure you want to delete this chat conversation? This operation cannot be undone.',
+      confirmText: 'Delete',
+      isDestructive: true,
+      iconType: 'danger'
+    });
+    if (confirmRes.ok) {
+      await deleteConversation(id);
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+      if (activeConvId === id) {
+        setActiveConvId(null);
+      }
     }
   }
 
@@ -305,7 +354,14 @@ export default function Home() {
   }
 
   async function handleDeleteProject(id: string) {
-    if (confirm('Are you sure you want to delete this project?')) {
+    const confirmRes = await triggerConfirmDialog({
+      title: 'Delete Project',
+      description: 'Are you sure you want to delete this project? All associated indexes will be discarded.',
+      confirmText: 'Delete',
+      isDestructive: true,
+      iconType: 'danger'
+    });
+    if (confirmRes.ok) {
       await deleteProject(id);
       setProjects((prev) => prev.filter((p) => p.id !== id));
       if (activeProjectId === id) {
@@ -316,7 +372,12 @@ export default function Home() {
 
   async function handleSaveMemory() {
     await saveUserMemory(userMemoryText);
-    alert('User Memory saved successfully!');
+    await triggerConfirmDialog({
+      title: 'Memory Saved',
+      description: 'User Memory instructions have been updated successfully.',
+      confirmText: 'Dismiss',
+      iconType: 'info'
+    });
   }
 
   // LLM Providers Handlers
@@ -366,7 +427,7 @@ export default function Home() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `laude_backup_${Date.now()}.json`;
+    a.download = `vega_backup_${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -383,9 +444,19 @@ export default function Home() {
         if (data.projects) setProjects(data.projects);
         if (data.mcpServers) setMcpServers(data.mcpServers);
         if (data.userMemory) setUserMemoryText(data.userMemory);
-        alert('Backup imported successfully!');
+        await triggerConfirmDialog({
+          title: 'Import Success',
+          description: 'Backup payload has been fully applied to your active database.',
+          confirmText: 'Dismiss',
+          iconType: 'info'
+        });
       } catch (err) {
-        alert('Invalid backup file format.');
+        await triggerConfirmDialog({
+          title: 'Import Failure',
+          description: 'Invalid backup file structure. Parse aborted.',
+          confirmText: 'Dismiss',
+          iconType: 'danger'
+        });
       }
     };
     reader.readAsText(file);
@@ -413,7 +484,14 @@ export default function Home() {
   }
 
   async function handleDeleteModel(modelName: string) {
-    if (confirm(`Are you sure you want to delete local model ${modelName}?`)) {
+    const confirmRes = await triggerConfirmDialog({
+      title: 'Delete Model',
+      description: `Are you sure you want to delete local model ${modelName}? This will clear disk space.`,
+      confirmText: 'Delete',
+      isDestructive: true,
+      iconType: 'danger'
+    });
+    if (confirmRes.ok) {
       await ollamaClient.deleteModel(modelName);
       await refreshModels();
     }
@@ -495,9 +573,18 @@ export default function Home() {
     setNewSchedPrompt('');
   }
 
-  function handleDeleteSchedule(id: string) {
-    deleteSchedule(id);
-    setSchedulesList([...getSchedules()]);
+  async function handleDeleteSchedule(id: string) {
+    const confirmRes = await triggerConfirmDialog({
+      title: 'Delete Schedule',
+      description: 'Are you sure you want to delete this automation schedule? Next executions will be cancelled.',
+      confirmText: 'Delete',
+      isDestructive: true,
+      iconType: 'danger'
+    });
+    if (confirmRes.ok) {
+      deleteSchedule(id);
+      setSchedulesList([...getSchedules()]);
+    }
   }
 
   // Build database-driven list of real artifacts from conversation message strings
@@ -1043,6 +1130,32 @@ If you have completed your task, reply normally without any JSON block.
           </div>
         </div>
       )}
+      {/* ConfirmDialog custom promise-based modal */}
+      <ConfirmDialog
+        isOpen={confirmDialogConfig.isOpen}
+        title={confirmDialogConfig.title}
+        description={confirmDialogConfig.description}
+        monospaceDetail={confirmDialogConfig.monospaceDetail}
+        checkboxLabel={confirmDialogConfig.checkboxLabel}
+        checkboxChecked={confirmDialogConfig.checkboxChecked}
+        onCheckboxChange={(checked) => setConfirmDialogConfig({ ...confirmDialogConfig, checkboxChecked: checked })}
+        confirmText={confirmDialogConfig.confirmText}
+        cancelText={confirmDialogConfig.cancelText}
+        isDestructive={confirmDialogConfig.isDestructive}
+        iconType={confirmDialogConfig.iconType}
+        onConfirm={() => {
+          if (confirmDialogConfig.resolve) {
+            confirmDialogConfig.resolve({ ok: true, checked: !!confirmDialogConfig.checkboxChecked });
+          }
+          setConfirmDialogConfig({ ...confirmDialogConfig, isOpen: false });
+        }}
+        onCancel={() => {
+          if (confirmDialogConfig.resolve) {
+            confirmDialogConfig.resolve({ ok: false, checked: !!confirmDialogConfig.checkboxChecked });
+          }
+          setConfirmDialogConfig({ ...confirmDialogConfig, isOpen: false });
+        }}
+      />
     </div>
   );
 }

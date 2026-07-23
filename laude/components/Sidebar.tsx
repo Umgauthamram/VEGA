@@ -408,7 +408,7 @@ export function Sidebar({
             </div>
             
             <div className="text-[9px] text-foreground/45 px-2 pt-1 border-t border-border-color/20 text-center font-mono">
-              Laude Desktop v1.0.0
+              VEGA Desktop v1.0.0
             </div>
           </div>
         )}

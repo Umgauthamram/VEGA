@@ -15,7 +15,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>('system');
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('laude-theme') as Theme | null;
+    const savedTheme = localStorage.getItem('vega-theme') as Theme | null;
     if (savedTheme) {
       setThemeState(savedTheme);
     }
@@ -35,7 +35,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
-    localStorage.setItem('laude-theme', newTheme);
+    localStorage.setItem('vega-theme', newTheme);
   };
 
   return (

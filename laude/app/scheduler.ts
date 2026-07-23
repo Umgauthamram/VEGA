@@ -141,7 +141,7 @@ export async function executeScheduleTask(
     }
 
     await triggerNotification(
-      `Laude: ${sched.name} Completed`,
+      `VEGA: ${sched.name} Completed`,
       `Scheduled run executed successfully using ${sched.model}.`
     );
   } catch (err: any) {
@@ -150,7 +150,7 @@ export async function executeScheduleTask(
     await saveScheduleDb(sched);
 
     await triggerNotification(
-      `Laude: ${sched.name} Failed`,
+      `VEGA: ${sched.name} Failed`,
       `Error: ${err.message || err}`
     );
   }
