@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+:root {
+  --background: #F5F4EE; /* warm ivory */
+  --foreground: #3D3929; /* dark text */
+  --sidebar: #EEEDE4;
+  --accent: #D97757; /* terracotta */
+  --accent-hover: #C25F3E;
+  --card-bg: #FFFFFF;
+  --border-color: #E2E0D4;
+}
+
+html.dark {
+  --background: #262624;
+  --foreground: #E5E2D9;
+  --sidebar: #1F1E1B;
+  --accent: #D97757;
+  --accent-hover: #E28C70;
+  --card-bg: #30302E;
+  --border-color: #3A3935;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-sidebar: var(--sidebar);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-card-bg: var(--card-bg);
+  --color-border-color: var(--border-color);
+  --font-sans: var(--font-geist-sans), sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+/* Artifact Webview sandboxed style container */
+.artifact-preview-iframe {
+  background: white;
+  border: none;
+  width: 100%;
+  height: 100%;
+}
+
