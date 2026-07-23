@@ -4,8 +4,8 @@
   --background: #F5F4EE; /* warm ivory */
   --foreground: #3D3929; /* dark text */
   --sidebar: #EEEDE4;
-  --accent: #D97757; /* terracotta */
-  --accent-hover: #C25F3E;
+  --accent: #16a34a; /* premium green */
+  --accent-hover: #15803d;
   --card-bg: #FFFFFF;
   --border-color: #E2E0D4;
 }
@@ -14,8 +14,8 @@ html.dark {
   --background: #262624;
   --foreground: #E5E2D9;
   --sidebar: #1F1E1B;
-  --accent: #D97757;
-  --accent-hover: #E28C70;
+  --accent: #10b981; /* dark-mode emerald green */
+  --accent-hover: #059669;
   --card-bg: #30302E;
   --border-color: #3A3935;
 }
